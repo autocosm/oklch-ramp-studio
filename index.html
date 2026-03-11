@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>okLCh Ramp Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ── DARK theme (default) ── */
+  :root {
+    --bg: #07070f;
+    --surface: #0e0e1c;
+    --surface2: #14142a;
+    --border: #1c1c34;
+    --border2: #252545;
+    --text: #d8d8f0;
+    --muted: #5a5a88;
+    --accent: #8b7cf8;
+    --accent2: #5b4fd4;
+    --danger: #f87c6e;
+    --success: #6ef8b0;
+  }
+
+  /* ── LIGHT theme override ── */
+  html[data-theme="light"] {
+    --bg: #f0f0f6;
+    --surface: #e4e4ee;
+    --surface2: #d8d8e8;
+    --border: #c4c4d8;
+    --border2: #b0b0cc;
+    --text: #18182c;
+    --muted: #6060a0;
+    --accent: #5b4fd4;
+    --accent2: #8b7cf8;
+    --danger: #c0402e;
+    --success: #1a7a50;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER ── */
+  header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .logo {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  .logo span { color: var(--accent); }
+
+  .ramp-name-input {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border2);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    padding: 4px 6px;
+    outline: none;
+    width: 160px;
+    transition: border-color 0.2s;
+  }
+
+  .ramp-name-input:focus { border-color: var(--accent); }
+  .ramp-name-input::placeholder { color: var(--muted); }
+
+  /* ── SWATCH DISPLAY ── */
+  #swatch-row {
+    display: flex;
+    height: clamp(110px, 22vw, 200px);
+    overflow: hidden;
+  }
+
+  .swatch {
+    flex: 1;
+    position: relative;
+    cursor: pointer;
+    transition: flex 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    padding-bottom: 10px;
+  }
+
+  .swatch:hover { flex: 2; }
+
+  .swatch-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+  }
+
+  .swatch:hover .swatch-label { opacity: 1; }
+
+  .swatch-step-num {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .swatch:hover .swatch-step-num { opacity: 0.8; }
+
+  /* ── HEX STRIP ── */
+  #hex-strip {
+    display: flex;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  #hex-strip::-webkit-scrollbar { display: none; }
+
+  .hex-cell {
+    flex: 1;
+    min-width: 64px;
+    padding: 8px 6px;
+    text-align: center;
+    border-right: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.15s;
+    position: relative;
+  }
+
+  .hex-cell:last-child { border-right: none; }
+  .hex-cell:hover { background: var(--surface); }
+
+  .hex-val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    display: block;
+  }
+
+  .hex-swatch-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin: 0 auto 4px;
+  }
+
+  .copy-toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(60px);
+    background: var(--surface2);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    padding: 8px 18px;
+    border-radius: 4px;
+    transition: transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.25s;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 100;
+    letter-spacing: 0.06em;
+  }
+
+  .copy-toast.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+
+  /* ── CONTROLS GRID ── */
+  #controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+  }
+
+  @media (max-width: 600px) {
+    #controls { grid-template-columns: 1fr; }
+  }
+
+  .control-panel {
+    padding: 18px 20px;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .control-panel:nth-child(even) { border-right: none; }
+
+  @media (max-width: 600px) {
+    .control-panel { border-right: none; }
+  }
+
+  .panel-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .slider-label {
+    font-size: 12px;
+    color: var(--muted);
+    width: 90px;
+    flex-shrink: 0;
+    font-weight: 400;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1;
+    height: 2px;
+    background: var(--border2);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 0 1px var(--accent2);
+    transition: transform 0.1s;
+  }
+
+  input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+  input[type="range"]::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 0 1px var(--accent2);
+  }
+
+  .slider-val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text);
+    width: 44px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* ── HUE GRADIENT TRACK ── */
+  #hueSlider {
+    background: linear-gradient(to right,
+      oklch(0.65 0.2 0),   oklch(0.65 0.2 30),  oklch(0.65 0.2 60),
+      oklch(0.65 0.2 90),  oklch(0.65 0.2 120), oklch(0.65 0.2 150),
+      oklch(0.65 0.2 180), oklch(0.65 0.2 210), oklch(0.65 0.2 240),
+      oklch(0.65 0.2 270), oklch(0.65 0.2 300), oklch(0.65 0.2 330),
+      oklch(0.65 0.2 360));
+    height: 6px;
+  }
+
+  /* ── GAMUT TOGGLE ── */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .toggle-label {
+    font-size: 12px;
+    color: var(--muted);
+    flex: 1;
+  }
+
+  .toggle-desc {
+    font-size: 10px;
+    color: var(--muted);
+    opacity: 0.6;
+    display: block;
+    margin-top: 1px;
+  }
+
+  .toggle-btn {
+    display: flex;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .toggle-opt {
+    padding: 5px 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    cursor: pointer;
+    color: var(--muted);
+    transition: background 0.15s, color 0.15s;
+    letter-spacing: 0.06em;
+    user-select: none;
+  }
+
+  .toggle-opt.active { background: var(--accent2); color: white; }
+
+  /* ── GAMUT CHIPS ── */
+  .gamut-bar { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+
+  .gamut-chip {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 2px;
+    letter-spacing: 0.06em;
+  }
+
+  .gamut-chip.in  { background: rgba(110,248,176,0.1); color: var(--success); border: 1px solid rgba(110,248,176,0.2); }
+  .gamut-chip.out { background: rgba(248,124,110,0.1); color: var(--danger);  border: 1px solid rgba(248,124,110,0.2); }
+
+  /* ── EXPORT PANEL ── */
+  .export-panel {
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border);
+    grid-column: 1 / -1;
+  }
+
+  .export-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+
+  .btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    padding: 7px 14px;
+    border: 1px solid var(--border2);
+    background: var(--surface2);
+    color: var(--text);
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.15s;
+    text-transform: uppercase;
+  }
+
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent2); border-color: var(--accent); color: white; }
+  .btn.primary:hover { background: var(--accent); }
+
+  #export-output {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 12px 14px;
+    width: 100%;
+    resize: vertical;
+    min-height: 80px;
+    outline: none;
+    border-radius: 3px;
+    line-height: 1.7;
+    display: none;
+  }
+
+  /* ── CURVE CANVAS ── */
+  #curve-canvas {
+    width: 100%;
+    height: 70px;
+    display: block;
+    margin-top: 10px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+  }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  /* ══════════════════════════════════════════════
+     SYSTEM VIEW — CONTROL PANEL
+     ══════════════════════════════════════════════ */
+
+  #system-panel {
+    grid-column: 1 / -1;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sys-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .sys-panel-header .panel-title { margin-bottom: 0; }
+
+  .sys-panel-desc {
+    font-size: 11px;
+    color: var(--muted);
+    flex: 1;
+    min-width: 160px;
+  }
+
+  /* Revealed section */
+  #system-inputs {
+    display: none;
+    margin-top: 18px;
+  }
+
+  #system-inputs.visible { display: block; }
+
+  .sys-count-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+  }
+
+  .sys-count-row .slider-label { width: auto; flex-shrink: 0; }
+
+  /* Hue input card grid */
+  #hue-input-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+    gap: 8px;
+  }
+
+  .hue-input-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: border-color 0.15s;
+  }
+
+  .hue-input-card:hover { border-color: var(--border2); }
+
+  .hue-card-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .hue-card-swatch {
+    width: 24px;
+    height: 24px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    border: 1px solid rgba(255,255,255,0.07);
+    transition: background 0.2s;
+  }
+
+  .hue-card-idx {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+
+  .hue-name-input {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px;
+    padding: 2px 4px;
+    outline: none;
+    width: 100%;
+    transition: border-color 0.15s, color 0.15s;
+  }
+
+  .hue-name-input:focus { border-color: var(--accent); color: var(--text); }
+  .hue-name-input::placeholder { color: var(--muted); opacity: 0.45; }
+
+  .hue-card-inputs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .hue-angle-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    flex-shrink: 0;
+    letter-spacing: 0.06em;
+  }
+
+  .hue-number-input {
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    padding: 4px 6px;
+    border-radius: 3px;
+    outline: none;
+    width: 58px;
+    transition: border-color 0.15s;
+    -moz-appearance: textfield;
+  }
+
+  .hue-number-input::-webkit-inner-spin-button,
+  .hue-number-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .hue-number-input:focus { border-color: var(--accent); }
+
+  /* Mini hue slider inside each card */
+  .hue-slider-mini {
+    width: 100% !important;
+    flex: none !important;
+    height: 6px !important;
+    border-radius: 3px !important;
+    background: linear-gradient(to right,
+      oklch(0.65 0.18 0),  oklch(0.65 0.18 60),  oklch(0.65 0.18 120),
+      oklch(0.65 0.18 180), oklch(0.65 0.18 240), oklch(0.65 0.18 300),
+      oklch(0.65 0.18 360)) !important;
+    cursor: pointer;
+    display: block;
+  }
+
+  /* ══════════════════════════════════════════════
+     SYSTEM VIEW — VISUALIZATION
+     ══════════════════════════════════════════════ */
+
+  #system-view {
+    display: none;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    background: var(--bg);
+  }
+
+  #system-view.visible { display: block; }
+
+  /* Sticky column header */
+  .sys-header-row {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg);
+    min-width: fit-content;
+  }
+
+  .sys-row-label {
+    width: 124px;
+    min-width: 124px;
+    padding: 7px 12px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+  }
+
+  .sys-label-name {
+    font-size: 11px;
+    color: var(--text);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sys-label-hue {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+  }
+
+  .sys-header-steps {
+    display: flex;
+    flex: 1;
+  }
+
+  .sys-step-head {
+    flex: 1;
+    min-width: 28px;
+    text-align: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    padding: 7px 2px;
+    border-right: 1px solid var(--border);
+  }
+
+  .sys-step-head:last-child { border-right: none; }
+
+  /* Ramp rows */
+  .sys-ramp-row {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    min-height: 44px;
+    min-width: fit-content;
+    transition: background 0.1s;
+  }
+
+  .sys-ramp-row:last-child { border-bottom: none; }
+  .sys-ramp-row:hover { background: rgba(255,255,255,0.012); }
+
+  /* Primary accent */
+  .sys-ramp-row.is-primary .sys-row-label {
+    border-left: 2px solid var(--accent);
+  }
+
+  .sys-ramp-row.is-primary .sys-label-name {
+    color: var(--accent);
+  }
+
+  /* Swatch cells */
+  .sys-swatches {
+    display: flex;
+    flex: 1;
+  }
+
+  .sys-swatch {
+    flex: 1;
+    min-width: 28px;
+    cursor: pointer;
+    position: relative;
+    border-right: 1px solid rgba(0,0,0,0.12);
+    transition: flex 0.15s ease;
+  }
+
+  .sys-swatch:last-child { border-right: none; }
+  .sys-swatch:hover { flex: 2.5; }
+
+  /* Hover tooltip */
+  .sys-swatch::after {
+    content: attr(data-hex);
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    padding: 3px 7px;
+    border-radius: 3px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s;
+    z-index: 20;
+    letter-spacing: 0.04em;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+
+  .sys-swatch:hover::after { opacity: 1; }
+
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">okLCh <span>&#9656;</span> Ramp Studio</div>
+  <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+    <div class="toggle-btn" title="Preview background">
+      <div class="toggle-opt" id="bg-opt-dark" onclick="setBgMode('dark')">DARK</div>
+      <div class="toggle-opt active" id="bg-opt-light" onclick="setBgMode('light')">LIGHT</div>
+    </div>
+    <input type="text" class="ramp-name-input" id="rampName" placeholder="ramp-name" value="brand">
+  </div>
+</header>
+
+<div id="ramp-display">
+  <div id="swatch-row"></div>
+  <div id="hex-strip"></div>
+</div>
+
+<div id="controls">
+
+  <!-- Hue & Chroma -->
+  <div class="control-panel">
+    <div class="panel-title">// Hue & Chroma</div>
+
+    <div class="slider-row">
+      <span class="slider-label">Hue</span>
+      <input type="range" id="hueSlider" min="0" max="360" step="1" value="265">
+      <span class="slider-val" id="hueVal">265°</span>
+    </div>
+
+    <div class="slider-row">
+      <span class="slider-label">Saturation</span>
+      <input type="range" id="satSlider" min="0" max="2" step="0.01" value="1">
+      <span class="slider-val" id="satVal">1.00×</span>
+    </div>
+
+    <div class="slider-row">
+      <span class="slider-label">Chroma Peak</span>
+      <input type="range" id="peakChromaSlider" min="0.05" max="0.38" step="0.005" value="0.18">
+      <span class="slider-val" id="peakChromaVal">0.18</span>
+    </div>
+
+    <div class="slider-row">
+      <span class="slider-label">Peak at L</span>
+      <input type="range" id="peakLSlider" min="0.2" max="0.8" step="0.01" value="0.55">
+      <span class="slider-val" id="peakLVal">0.55</span>
+    </div>
+
+    <canvas id="curve-canvas"></canvas>
+  </div>
+
+  <!-- Lightness Range & Steps -->
+  <div class="control-panel">
+    <div class="panel-title">// Lightness Range & Steps</div>
+
+    <div class="slider-row">
+      <span class="slider-label">Light end</span>
+      <input type="range" id="lightEndSlider" min="0.85" max="0.99" step="0.005" value="0.97">
+      <span class="slider-val" id="lightEndVal">0.97</span>
+    </div>
+
+    <div class="slider-row">
+      <span class="slider-label">Dark end</span>
+      <input type="range" id="darkEndSlider" min="0.01" max="0.3" step="0.005" value="0.12">
+      <span class="slider-val" id="darkEndVal">0.12</span>
+    </div>
+
+    <div class="slider-row">
+      <span class="slider-label">Steps</span>
+      <input type="range" id="stepsSlider" min="3" max="21" step="2" value="11">
+      <span class="slider-val" id="stepsVal">11</span>
+    </div>
+
+    <div class="slider-row">
+      <span class="slider-label">Hue shift</span>
+      <input type="range" id="hueShiftSlider" min="-30" max="30" step="0.5" value="0">
+      <span class="slider-val" id="hueShiftVal">0°</span>
+    </div>
+
+    <div style="margin-top:4px;">
+      <div class="panel-title" style="margin-bottom:8px;">// Gamut handling</div>
+      <div class="toggle-row">
+        <div>
+          <span class="toggle-label">Out-of-gamut</span>
+          <span class="toggle-desc" id="gamut-desc">Smart = preserve hue · Naive = allow hue shift · Comp = per-channel ratio</span>
+        </div>
+        <div class="toggle-btn">
+          <div class="toggle-opt active" id="opt-smart"    onclick="setGamut('smart')">SMART</div>
+          <div class="toggle-opt"        id="opt-naive"    onclick="setGamut('naive')">NAIVE</div>
+          <div class="toggle-opt"        id="opt-compress" onclick="setGamut('compress')">COMP</div>
+        </div>
+      </div>
+      <!-- Ratio slider — only visible in COMP mode -->
+      <div class="slider-row" id="comp-ratio-row" style="display:none;margin-top:10px;">
+        <span class="slider-label">Ratio</span>
+        <input type="range" id="compRatioSlider" min="1.5" max="20" step="0.5" value="4">
+        <span class="slider-val" id="compRatioVal">4:1</span>
+      </div>
+      <div class="gamut-bar" id="gamutBar"></div>
+    </div>
+  </div>
+
+  <!-- Export -->
+  <div class="export-panel">
+    <div class="panel-title">// Export</div>
+    <div class="export-actions">
+      <button class="btn primary" onclick="exportCSS()">CSS vars</button>
+      <button class="btn" onclick="exportJSON()">JSON</button>
+      <button class="btn" onclick="exportSCSS()">SCSS map</button>
+      <button class="btn" onclick="exportTailwind()">Tailwind</button>
+      <button class="btn" onclick="copyAll()">Copy all hex</button>
+    </div>
+    <textarea id="export-output" readonly onclick="this.select()"></textarea>
+  </div>
+
+  <!-- System View Controls -->
+  <div id="system-panel">
+    <div class="sys-panel-header">
+      <span class="panel-title" style="margin-bottom:0;">// Color System View</span>
+      <span class="sys-panel-desc">Visualize primary ramp against additional hues sharing the same curve</span>
+      <div class="toggle-btn">
+        <div class="toggle-opt active" id="sys-opt-off" onclick="setSystemView(false)">OFF</div>
+        <div class="toggle-opt" id="sys-opt-on"  onclick="setSystemView(true)">ON</div>
+      </div>
+    </div>
+
+    <div id="system-inputs">
+      <div class="sys-count-row">
+        <span class="slider-label" style="width:auto;">Additional hues</span>
+        <input type="range" id="sysCountSlider" min="1" max="11" step="1" value="3">
+        <span class="slider-val" id="sysCountVal">3</span>
+      </div>
+      <div id="hue-input-grid"></div>
+    </div>
+  </div>
+
+</div><!-- /#controls -->
+
+<!-- System View Visualization — rendered outside the controls grid -->
+<div id="system-view">
+  <div id="sys-header-row" class="sys-header-row"></div>
+  <div id="sys-ramps"></div>
+</div>
+
+<div class="copy-toast" id="toast"></div>
+
+<script>
+/* ════════════════════════════════════
+   COLOR MATH
+   ════════════════════════════════════ */
+
+function oklchToLinearRGB(L, C, h) {
+  const hr = h * Math.PI / 180;
+  const a_ = C * Math.cos(hr);
+  const b_ = C * Math.sin(hr);
+
+  const l_ = L + 0.3963377774 * a_ + 0.2158037573 * b_;
+  const m_ = L - 0.1055613458 * a_ - 0.0638541728 * b_;
+  const s_ = L - 0.0894841775 * a_ - 1.2914855480 * b_;
+
+  const l = l_ * l_ * l_;
+  const m = m_ * m_ * m_;
+  const s = s_ * s_ * s_;
+
+  return [
+    +4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s
+  ];
+}
+
+function linearToSRGB(c) {
+  return c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+}
+
+function clamp01(x) { return Math.max(0, Math.min(1, x)); }
+
+function isInGamut(r, g, b, eps = 0.001) {
+  return r >= -eps && r <= 1+eps && g >= -eps && g <= 1+eps && b >= -eps && b <= 1+eps;
+}
+
+function smartGamutMap(L, C, h) {
+  let [r, g, b] = oklchToLinearRGB(L, C, h);
+  if (isInGamut(r, g, b)) return { r, g, b, clipped: false };
+  let lo = 0, hi = C, mid;
+  for (let i = 0; i < 24; i++) {
+    mid = (lo + hi) / 2;
+    [r, g, b] = oklchToLinearRGB(L, mid, h);
+    isInGamut(r, g, b) ? (lo = mid) : (hi = mid);
+  }
+  [r, g, b] = oklchToLinearRGB(L, lo, h);
+  return { r, g, b, clipped: true };
+}
+
+// Find the maximum in-gamut chroma for a given L and h via binary search.
+// This is the gamut ceiling in okLCh space — identical to the search in
+// smartGamutMap but returns the chroma value rather than the RGB triple.
+function findMaxChroma(L, h) {
+  let lo = 0, hi = 0.5, mid;
+  // Ensure hi is actually out of gamut before searching
+  let [r, g, b] = oklchToLinearRGB(L, hi, h);
+  if (isInGamut(r, g, b)) {
+    // Expand until we find an out-of-gamut value
+    while (isInGamut(...oklchToLinearRGB(L, hi, h)) && hi < 1) hi *= 2;
+  }
+  for (let i = 0; i < 28; i++) {
+    mid = (lo + hi) / 2;
+    [r, g, b] = oklchToLinearRGB(L, mid, h);
+    isInGamut(r, g, b) ? (lo = mid) : (hi = mid);
+  }
+  return lo;
+}
+
+// Chroma-space ratio compression. The threshold is the per-hue, per-lightness
+// gamut ceiling — the maximum in-gamut chroma at exactly this L and h.
+// Colors below the ceiling pass through identically to SMART.
+// Colors above get a softer knee: excess chroma is retained but attenuated
+// by the ratio, producing a compressed C that lands between the ceiling and
+// the original request. Because hue is never touched, any residual out-of-gamut
+// amount after compression is tiny and the final RGB clamp causes only a
+// hair of lightness shift — the "dynamic" character that varies by hue angle.
+function compressGamutMap(L, C, h, ratio) {
+  const maxC = findMaxChroma(L, h);
+  if (C <= maxC) {
+    const [r, g, b] = oklchToLinearRGB(L, C, h);
+    return { r, g, b, clipped: false };
+  }
+  // Apply ratio compression to the excess above the gamut ceiling
+  const compressedC = maxC + (C - maxC) / ratio;
+  const [r, g, b] = oklchToLinearRGB(L, compressedC, h);
+  return { r, g, b, clipped: true };
+}
+
+function oklchToHex(L, C, h, mode, ratio = 4) {
+  let r, g, b, clipped = false;
+  if (mode === 'smart') {
+    ({ r, g, b, clipped } = smartGamutMap(L, C, h));
+  } else if (mode === 'compress') {
+    ({ r, g, b, clipped } = compressGamutMap(L, C, h, ratio));
+  } else {
+    // naive — raw channels, hard clamp
+    [r, g, b] = oklchToLinearRGB(L, C, h);
+    if (!isInGamut(r, g, b)) clipped = true;
+  }
+  r = linearToSRGB(clamp01(r));
+  g = linearToSRGB(clamp01(g));
+  b = linearToSRGB(clamp01(b));
+  const toH = x => Math.round(clamp01(x) * 255).toString(16).padStart(2, '0');
+  return { hex: `#${toH(r)}${toH(g)}${toH(b)}`, clipped };
+}
+
+function chromaCurve(L, peakC, peakL, satMult) {
+  const t = L <= peakL ? L / peakL : (1 - L) / (1 - peakL);
+  return satMult * peakC * Math.sqrt(Math.max(0, t));
+}
+
+function midtoneHex(hue, p) {
+  const C = chromaCurve(p.peakL, p.peakChroma, p.peakL, p.sat);
+  return oklchToHex(p.peakL, C, hue, p.gamut, p.compRatio).hex;
+}
+
+/* ════════════════════════════════════
+   STATE
+   ════════════════════════════════════ */
+
+const state = {
+  gamut: 'smart',
+  compRatio: 4,
+  systemEnabled: false,
+  systemHues: []   // [{hue:number, name:string}]
+};
+
+// Distributed offsets used when auto-filling new hue slots
+const HUE_OFFSETS = [120, 240, 60, 180, 300, 30, 150, 270, 90, 210, 330];
+
+function getParams() {
+  return {
+    hue:        +document.getElementById('hueSlider').value,
+    sat:        +document.getElementById('satSlider').value,
+    peakChroma: +document.getElementById('peakChromaSlider').value,
+    peakL:      +document.getElementById('peakLSlider').value,
+    lightEnd:   +document.getElementById('lightEndSlider').value,
+    darkEnd:    +document.getElementById('darkEndSlider').value,
+    steps:      +document.getElementById('stepsSlider').value,
+    hueShift:   +document.getElementById('hueShiftSlider').value,
+    gamut:      state.gamut,
+    compRatio:  state.compRatio
+  };
+}
+
+/* ════════════════════════════════════
+   RAMP GENERATION
+   ════════════════════════════════════ */
+
+function generateRamp(p, overrideHue) {
+  const baseHue = overrideHue !== undefined ? overrideHue : p.hue;
+  const swatches = [];
+  for (let i = 0; i < p.steps; i++) {
+    const t = i / (p.steps - 1);
+    const L = p.lightEnd - t * (p.lightEnd - p.darkEnd);
+    const hueAtStep = baseHue + p.hueShift * (t - 0.5) * 2;
+    const C = chromaCurve(L, p.peakChroma, p.peakL, p.sat);
+    const { hex, clipped } = oklchToHex(L, C, hueAtStep, p.gamut, p.compRatio);
+    const stepKey = Math.round(t * 900 + 50);
+    swatches.push({ L, C, h: hueAtStep, hex, clipped, step: stepKey, index: i });
+  }
+  return swatches;
+}
+
+/* ════════════════════════════════════
+   PRIMARY RENDER
+   ════════════════════════════════════ */
+
+function render() {
+  const p = getParams();
+  const swatches = generateRamp(p);
+
+  // Slider labels
+  document.getElementById('hueVal').textContent        = `${p.hue}°`;
+  document.getElementById('satVal').textContent         = `${p.sat.toFixed(2)}×`;
+  document.getElementById('peakChromaVal').textContent  = p.peakChroma.toFixed(3);
+  document.getElementById('peakLVal').textContent       = p.peakL.toFixed(2);
+  document.getElementById('lightEndVal').textContent    = p.lightEnd.toFixed(3);
+  document.getElementById('darkEndVal').textContent     = p.darkEnd.toFixed(3);
+  document.getElementById('stepsVal').textContent       = p.steps;
+  document.getElementById('hueShiftVal').textContent   = `${p.hueShift >= 0 ? '+' : ''}${p.hueShift.toFixed(1)}°`;
+
+  // Hero swatch row (dark → light, left → right to match curve canvas)
+  const row = document.getElementById('swatch-row');
+  row.innerHTML = '';
+  [...swatches].reverse().forEach(s => {
+    const el = document.createElement('div');
+    el.className = 'swatch';
+    el.style.background = s.hex;
+    const fg = s.L > 0.55 ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.7)';
+    const fgStrong = s.L > 0.55 ? 'rgba(0,0,0,0.75)' : 'rgba(255,255,255,0.9)';
+    el.innerHTML = `
+      <span class="swatch-step-num" style="color:${fg}">${s.step}</span>
+      <span class="swatch-label" style="color:${fgStrong}">${s.hex}</span>
+    `;
+    el.onclick = () => copyText(s.hex);
+    row.appendChild(el);
+  });
+
+  // Hex strip
+  const strip = document.getElementById('hex-strip');
+  strip.innerHTML = '';
+  [...swatches].reverse().forEach(s => {
+    const cell = document.createElement('div');
+    cell.className = 'hex-cell';
+    cell.innerHTML = `
+      <div class="hex-swatch-dot" style="background:${s.hex}"></div>
+      <span class="hex-val">${s.hex}</span>
+    `;
+    cell.onclick = () => copyText(s.hex);
+    strip.appendChild(cell);
+  });
+
+  // Gamut chips
+  const gamutBar = document.getElementById('gamutBar');
+  gamutBar.innerHTML = '';
+  swatches.forEach(s => {
+    const chip = document.createElement('span');
+    chip.className = `gamut-chip ${s.clipped ? 'out' : 'in'}`;
+    chip.textContent = `${s.step} ${s.clipped ? '⚠' : '✓'}`;
+    gamutBar.appendChild(chip);
+  });
+
+  drawCurve(p);
+
+  // Refresh export output if open
+  const out = document.getElementById('export-output');
+  if (out.style.display !== 'none' && out.dataset.mode) {
+    exportMode(out.dataset.mode, swatches, p);
+  }
+
+  // Refresh hue card dot previews
+  updateHueCardSwatches(p);
+
+  // System view
+  if (state.systemEnabled) renderSystemView(p, swatches);
+
+  window._swatches = swatches;
+  window._params = p;
+}
+
+/* ════════════════════════════════════
+   CURVE CANVAS
+   ════════════════════════════════════ */
+
+function drawCurve(p) {
+  const canvas = document.getElementById('curve-canvas');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.scale(dpr, dpr);
+
+  ctx.fillStyle = '#07070f';
+  ctx.fillRect(0, 0, W, H);
+
+  const maxC = 0.38;
+
+  ctx.beginPath();
+  ctx.strokeStyle = '#8b7cf8';
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i <= W; i++) {
+    const L = i / W;
+    const C = chromaCurve(L, p.peakChroma, p.peakL, p.sat);
+    const y = H - (C / maxC) * H;
+    i === 0 ? ctx.moveTo(i, y) : ctx.lineTo(i, y);
+  }
+  ctx.stroke();
+
+  for (let i = 0; i < p.steps; i++) {
+    const t = i / (p.steps - 1);
+    const L = p.lightEnd - t * (p.lightEnd - p.darkEnd);
+    const C = chromaCurve(L, p.peakChroma, p.peakL, p.sat);
+    const { hex } = oklchToHex(L, C, p.hue, p.gamut, p.compRatio);
+    const x = L * W, y = H - (C / maxC) * H;
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = hex;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = '#5a5a88';
+  ctx.font = `9px 'IBM Plex Mono', monospace`;
+  ctx.fillText('L →', 4, H - 4);
+  ctx.fillText('C ↑', 4, 10);
+}
+
+/* ════════════════════════════════════
+   GAMUT TOGGLE
+   ════════════════════════════════════ */
+
+function setBgMode(mode) {
+  document.documentElement.setAttribute('data-theme', mode);
+  document.getElementById('bg-opt-dark').classList.toggle('active',  mode === 'dark');
+  document.getElementById('bg-opt-light').classList.toggle('active', mode === 'light');
+}
+
+function setGamut(mode) {
+  state.gamut = mode;
+  document.getElementById('opt-smart').classList.toggle('active',    mode === 'smart');
+  document.getElementById('opt-naive').classList.toggle('active',    mode === 'naive');
+  document.getElementById('opt-compress').classList.toggle('active', mode === 'compress');
+  document.getElementById('comp-ratio-row').style.display = mode === 'compress' ? 'flex' : 'none';
+  render();
+}
+
+/* ════════════════════════════════════
+   SYSTEM VIEW — CONTROLS
+   ════════════════════════════════════ */
+
+function setSystemView(enabled) {
+  state.systemEnabled = enabled;
+  document.getElementById('sys-opt-off').classList.toggle('active', !enabled);
+  document.getElementById('sys-opt-on').classList.toggle('active', enabled);
+
+  const inputs = document.getElementById('system-inputs');
+  const view   = document.getElementById('system-view');
+
+  if (enabled) {
+    inputs.classList.add('visible');
+    view.classList.add('visible');
+    syncSystemHueCount();
+  } else {
+    inputs.classList.remove('visible');
+    view.classList.remove('visible');
+  }
+}
+
+function syncSystemHueCount() {
+  const count = +document.getElementById('sysCountSlider').value;
+  document.getElementById('sysCountVal').textContent = count;
+
+  const p = getParams();
+
+  // Grow — fill new slots with auto-distributed hues
+  while (state.systemHues.length < count) {
+    const idx = state.systemHues.length;
+    const raw = p.hue + HUE_OFFSETS[idx % HUE_OFFSETS.length];
+    state.systemHues.push({ hue: Math.round(((raw % 360) + 360) % 360), name: '' });
+  }
+
+  // Shrink
+  state.systemHues = state.systemHues.slice(0, count);
+
+  buildHueInputGrid(p);
+  render();
+}
+
+function buildHueInputGrid(p) {
+  const grid = document.getElementById('hue-input-grid');
+  grid.innerHTML = '';
+
+  state.systemHues.forEach((entry, i) => {
+    const preview = midtoneHex(entry.hue, p);
+    const card = document.createElement('div');
+    card.className = 'hue-input-card';
+    card.innerHTML = `
+      <div class="hue-card-top">
+        <div class="hue-card-swatch" id="hcs-${i}" style="background:${preview};"></div>
+        <span class="hue-card-idx">HUE ${i + 1}</span>
+      </div>
+      <input type="text" class="hue-name-input" id="sys-name-${i}"
+             placeholder="label…" value="${entry.name}" maxlength="20">
+      <div class="hue-card-inputs">
+        <span class="hue-angle-label">H°</span>
+        <input type="number" class="hue-number-input" id="sys-hue-${i}"
+               min="0" max="360" step="1" value="${entry.hue}">
+      </div>
+      <input type="range" class="hue-slider-mini" id="sys-slider-${i}"
+             min="0" max="360" step="1" value="${entry.hue}">
+    `;
+    grid.appendChild(card);
+
+    const numEl    = card.querySelector(`#sys-hue-${i}`);
+    const sliderEl = card.querySelector(`#sys-slider-${i}`);
+    const nameEl   = card.querySelector(`#sys-name-${i}`);
+    const dotEl    = card.querySelector(`#hcs-${i}`);
+
+    function onHueChange(val) {
+      const h = ((+val % 360) + 360) % 360;
+      state.systemHues[i].hue = h;
+      numEl.value    = Math.round(h);
+      sliderEl.value = h;
+      dotEl.style.background = midtoneHex(h, getParams());
+      if (state.systemEnabled) render();
+    }
+
+    numEl.addEventListener('input',    () => onHueChange(numEl.value));
+    sliderEl.addEventListener('input', () => onHueChange(sliderEl.value));
+    nameEl.addEventListener('input', () => {
+      state.systemHues[i].name = nameEl.value;
+      if (state.systemEnabled) render();
+    });
+  });
+}
+
+// Lightweight refresh: just update the card dot colours (no full rebuild)
+function updateHueCardSwatches(p) {
+  state.systemHues.forEach((entry, i) => {
+    const dot = document.getElementById(`hcs-${i}`);
+    if (dot) dot.style.background = midtoneHex(entry.hue, p);
+  });
+}
+
+/* ════════════════════════════════════
+   SYSTEM VIEW — VISUALIZATION
+   ════════════════════════════════════ */
+
+function renderSystemView(p, primarySwatches) {
+  const headerEl = document.getElementById('sys-header-row');
+  const rampsEl  = document.getElementById('sys-ramps');
+  const primName = document.getElementById('rampName').value.trim() || 'primary';
+
+  // Step header
+  headerEl.innerHTML = `
+    <div class="sys-row-label" style="justify-content:flex-end;padding-bottom:5px;">
+      <span class="sys-label-hue">STEP</span>
+    </div>
+    <div class="sys-header-steps">
+      ${primarySwatches.map(s => `<div class="sys-step-head">${s.step}</div>`).join('')}
+    </div>
+  `;
+
+  // Assemble all ramps: primary first
+  const allRamps = [
+    { label: primName, hue: p.hue, swatches: primarySwatches, isPrimary: true }
+  ];
+
+  state.systemHues.forEach((entry, i) => {
+    allRamps.push({
+      label: entry.name.trim() || `hue-${Math.round(entry.hue)}`,
+      hue: entry.hue,
+      swatches: generateRamp(p, entry.hue),
+      isPrimary: false
+    });
+  });
+
+  rampsEl.innerHTML = '';
+
+  allRamps.forEach(ramp => {
+    const row = document.createElement('div');
+    row.className = `sys-ramp-row${ramp.isPrimary ? ' is-primary' : ''}`;
+
+    row.innerHTML = `
+      <div class="sys-row-label">
+        <span class="sys-label-name" title="${ramp.label}">${ramp.label}</span>
+        <span class="sys-label-hue">${Math.round(ramp.hue)}°</span>
+      </div>
+      <div class="sys-swatches">
+        ${ramp.swatches.map(s => `
+          <div class="sys-swatch"
+               style="background:${s.hex};"
+               data-hex="${s.hex}"
+               onclick="copyText('${s.hex}')"></div>
+        `).join('')}
+      </div>
+    `;
+
+    rampsEl.appendChild(row);
+  });
+}
+
+/* ════════════════════════════════════
+   EXPORT
+   ════════════════════════════════════ */
+
+function getExportName() {
+  return document.getElementById('rampName').value.trim().replace(/\s+/g, '-') || 'ramp';
+}
+
+function exportMode(mode, swatches, p) {
+  const name = getExportName();
+  const out  = document.getElementById('export-output');
+  out.style.display = 'block';
+  out.dataset.mode  = mode;
+
+  let text = '';
+  if (mode === 'css') {
+    text = `:root {\n` + swatches.map(s => `  --${name}-${s.step}: ${s.hex};`).join('\n') + `\n}`;
+  } else if (mode === 'json') {
+    const obj = {};
+    swatches.forEach(s => { obj[s.step] = s.hex; });
+    text = JSON.stringify({ [name]: obj }, null, 2);
+  } else if (mode === 'scss') {
+    text = `$${name}: (\n` + swatches.map(s => `  "${s.step}": ${s.hex},`).join('\n') + `\n);`;
+  } else if (mode === 'tailwind') {
+    text = `// tailwind.config.js\n'${name}': {\n` + swatches.map(s => `  '${s.step}': '${s.hex}',`).join('\n') + `\n},`;
+  } else if (mode === 'hex') {
+    text = swatches.map(s => s.hex).join('\n');
+  }
+
+  out.value = text;
+  out.select();
+  navigator.clipboard.writeText(text).catch(() => {});
+}
+
+function exportCSS()      { exportMode('css',      window._swatches, window._params); }
+function exportJSON()     { exportMode('json',     window._swatches, window._params); }
+function exportSCSS()     { exportMode('scss',     window._swatches, window._params); }
+function exportTailwind() { exportMode('tailwind', window._swatches, window._params); }
+function copyAll()        { exportMode('hex',      window._swatches, window._params); }
+
+/* ════════════════════════════════════
+   COPY TOAST
+   ════════════════════════════════════ */
+
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    const t = document.getElementById('toast');
+    t.textContent = `Copied ${text}`;
+    t.classList.add('show');
+    clearTimeout(t._tid);
+    t._tid = setTimeout(() => t.classList.remove('show'), 1800);
+  }).catch(() => {});
+}
+
+/* ════════════════════════════════════
+   EVENTS
+   ════════════════════════════════════ */
+
+document.querySelectorAll('#controls input[type="range"]').forEach(el => {
+  if (el.id === 'sysCountSlider') return;
+  if (el.id === 'compRatioSlider') return;
+  el.addEventListener('input', render);
+});
+
+document.getElementById('compRatioSlider').addEventListener('input', function() {
+  state.compRatio = +this.value;
+  const display = Number.isInteger(state.compRatio) ? state.compRatio : state.compRatio.toFixed(1);
+  document.getElementById('compRatioVal').textContent = `${display}:1`;
+  render();
+});
+
+document.getElementById('sysCountSlider').addEventListener('input', syncSystemHueCount);
+
+document.getElementById('rampName').addEventListener('input', () => {
+  const out = document.getElementById('export-output');
+  if (out.style.display !== 'none' && out.dataset.mode) {
+    exportMode(out.dataset.mode, window._swatches, window._params);
+  }
+  if (state.systemEnabled) render();
+});
+
+window.addEventListener('resize', render);
+
+/* ════════════════════════════════════
+   INIT — default OFF
+   ════════════════════════════════════ */
+render();
+</script>
+</body>
+</html>
