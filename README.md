@@ -195,9 +195,3 @@ LICENSE
 ## License
 
 This project is released under the **MIT License**. See `LICENSE` for the full text.
-
-MIT is the right choice here for a few reasons. It imposes the fewest barriers to use — anyone can run it, fork it, embed it in a larger tool, or redistribute it freely without restriction. It explicitly requires that the copyright notice and license text be preserved in any copy or substantial portion of the software, which is the standard mechanism for attribution in open source. It is universally understood by developers, compatible with virtually every other open source license, and accepted without friction by employers, clients, and institutions.
-
-If you want attribution to extend more explicitly to derivative UI work (e.g. requiring that a fork credit the original author visibly in the interface, not just in a license file), the **Creative Commons Attribution 4.0 International (CC BY 4.0)** license is an alternative worth considering. CC BY 4.0 has stronger attribution language and is designed with remixing in mind. However, it is not an OSI-approved software license, which can create friction in some professional and institutional contexts. For a single-file browser tool with no package ecosystem dependencies, that tradeoff may be acceptable.
-
-**Recommendation: MIT.** Add a `LICENSE` file to the repo root with the standard MIT text, your name, and the current year.
