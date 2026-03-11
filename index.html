@@ -290,6 +290,20 @@
     flex-shrink: 0;
   }
 
+  input.slider-val {
+    background: transparent;
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    padding: 1px 3px;
+    outline: none;
+    cursor: text;
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+  input.slider-val::-webkit-inner-spin-button,
+  input.slider-val::-webkit-outer-spin-button { -webkit-appearance: none; }
+  input.slider-val:focus { border-color: var(--accent); }
+
   /* ── HUE GRADIENT TRACK ── */
   #hueSlider {
     background: linear-gradient(to right,
@@ -545,6 +559,7 @@
     outline: none;
     width: 58px;
     transition: border-color 0.15s;
+    appearance: textfield;
     -moz-appearance: textfield;
   }
 
@@ -709,8 +724,8 @@
   <div class="logo">okLCh <span>&#9656;</span> Ramp Studio</div>
   <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
     <div class="toggle-btn" title="Preview background">
-      <div class="toggle-opt" id="bg-opt-dark" onclick="setBgMode('dark')">DARK</div>
-      <div class="toggle-opt active" id="bg-opt-light" onclick="setBgMode('light')">LIGHT</div>
+      <div class="toggle-opt active" id="bg-opt-dark" onclick="setBgMode('dark')">DARK</div>
+      <div class="toggle-opt" id="bg-opt-light" onclick="setBgMode('light')">LIGHT</div>
     </div>
     <input type="text" class="ramp-name-input" id="rampName" placeholder="ramp-name" value="brand">
   </div>
@@ -730,25 +745,25 @@
     <div class="slider-row">
       <span class="slider-label">Hue</span>
       <input type="range" id="hueSlider" min="0" max="360" step="1" value="265">
-      <span class="slider-val" id="hueVal">265°</span>
+      <input type="number" class="slider-val" id="hueVal" min="0" max="360" step="1" value="265">
     </div>
 
     <div class="slider-row">
       <span class="slider-label">Saturation</span>
       <input type="range" id="satSlider" min="0" max="2" step="0.01" value="1">
-      <span class="slider-val" id="satVal">1.00×</span>
+      <input type="number" class="slider-val" id="satVal" min="0" max="2" step="0.01" value="1">
     </div>
 
     <div class="slider-row">
       <span class="slider-label">Chroma Peak</span>
       <input type="range" id="peakChromaSlider" min="0.05" max="0.38" step="0.005" value="0.18">
-      <span class="slider-val" id="peakChromaVal">0.18</span>
+      <input type="number" class="slider-val" id="peakChromaVal" min="0.05" max="0.38" step="0.005" value="0.18">
     </div>
 
     <div class="slider-row">
       <span class="slider-label">Peak at L</span>
       <input type="range" id="peakLSlider" min="0.2" max="0.8" step="0.01" value="0.55">
-      <span class="slider-val" id="peakLVal">0.55</span>
+      <input type="number" class="slider-val" id="peakLVal" min="0.2" max="0.8" step="0.01" value="0.55">
     </div>
 
     <canvas id="curve-canvas"></canvas>
@@ -761,25 +776,25 @@
     <div class="slider-row">
       <span class="slider-label">Light end</span>
       <input type="range" id="lightEndSlider" min="0.85" max="0.99" step="0.005" value="0.97">
-      <span class="slider-val" id="lightEndVal">0.97</span>
+      <input type="number" class="slider-val" id="lightEndVal" min="0.85" max="0.99" step="0.005" value="0.97">
     </div>
 
     <div class="slider-row">
       <span class="slider-label">Dark end</span>
       <input type="range" id="darkEndSlider" min="0.01" max="0.3" step="0.005" value="0.12">
-      <span class="slider-val" id="darkEndVal">0.12</span>
+      <input type="number" class="slider-val" id="darkEndVal" min="0.01" max="0.3" step="0.005" value="0.12">
     </div>
 
     <div class="slider-row">
       <span class="slider-label">Steps</span>
       <input type="range" id="stepsSlider" min="3" max="21" step="2" value="11">
-      <span class="slider-val" id="stepsVal">11</span>
+      <input type="number" class="slider-val" id="stepsVal" min="3" max="21" step="2" value="11">
     </div>
 
     <div class="slider-row">
       <span class="slider-label">Hue shift</span>
       <input type="range" id="hueShiftSlider" min="-30" max="30" step="0.5" value="0">
-      <span class="slider-val" id="hueShiftVal">0°</span>
+      <input type="number" class="slider-val" id="hueShiftVal" min="-30" max="30" step="0.5" value="0">
     </div>
 
     <div style="margin-top:4px;">
@@ -799,7 +814,7 @@
       <div class="slider-row" id="comp-ratio-row" style="display:none;margin-top:10px;">
         <span class="slider-label">Ratio</span>
         <input type="range" id="compRatioSlider" min="1.5" max="20" step="0.5" value="4">
-        <span class="slider-val" id="compRatioVal">4:1</span>
+        <input type="number" class="slider-val" id="compRatioVal" min="1.5" max="20" step="0.5" value="4">
       </div>
       <div class="gamut-bar" id="gamutBar"></div>
     </div>
@@ -1020,15 +1035,20 @@ function render() {
   const p = getParams();
   const swatches = generateRamp(p);
 
-  // Slider labels
-  document.getElementById('hueVal').textContent        = `${p.hue}°`;
-  document.getElementById('satVal').textContent         = `${p.sat.toFixed(2)}×`;
-  document.getElementById('peakChromaVal').textContent  = p.peakChroma.toFixed(3);
-  document.getElementById('peakLVal').textContent       = p.peakL.toFixed(2);
-  document.getElementById('lightEndVal').textContent    = p.lightEnd.toFixed(3);
-  document.getElementById('darkEndVal').textContent     = p.darkEnd.toFixed(3);
-  document.getElementById('stepsVal').textContent       = p.steps;
-  document.getElementById('hueShiftVal').textContent   = `${p.hueShift >= 0 ? '+' : ''}${p.hueShift.toFixed(1)}°`;
+  // Slider labels (inputs — only update if not focused to avoid fighting user input)
+  function syncVal(id, val) {
+    const el = document.getElementById(id);
+    if (document.activeElement !== el) el.value = val;
+  }
+  syncVal('hueVal',        p.hue);
+  syncVal('satVal',        p.sat.toFixed(2));
+  syncVal('peakChromaVal', p.peakChroma.toFixed(3));
+  syncVal('peakLVal',      p.peakL.toFixed(2));
+  syncVal('lightEndVal',   p.lightEnd.toFixed(3));
+  syncVal('darkEndVal',    p.darkEnd.toFixed(3));
+  syncVal('stepsVal',      p.steps);
+  syncVal('hueShiftVal',   p.hueShift.toFixed(1));
+  syncVal('compRatioVal',  state.compRatio);
 
   // Hero swatch row (dark → light, left → right to match curve canvas)
   const row = document.getElementById('swatch-row');
@@ -1379,12 +1399,45 @@ document.querySelectorAll('#controls input[type="range"]').forEach(el => {
 
 document.getElementById('compRatioSlider').addEventListener('input', function() {
   state.compRatio = +this.value;
-  const display = Number.isInteger(state.compRatio) ? state.compRatio : state.compRatio.toFixed(1);
-  document.getElementById('compRatioVal').textContent = `${display}:1`;
   render();
 });
 
 document.getElementById('sysCountSlider').addEventListener('input', syncSystemHueCount);
+
+// Number inputs drive their paired range sliders
+[
+  ['hueVal',        'hueSlider'],
+  ['satVal',        'satSlider'],
+  ['peakChromaVal', 'peakChromaSlider'],
+  ['peakLVal',      'peakLSlider'],
+  ['lightEndVal',   'lightEndSlider'],
+  ['darkEndVal',    'darkEndSlider'],
+  ['stepsVal',      'stepsSlider'],
+  ['hueShiftVal',   'hueShiftSlider'],
+  ['compRatioVal',  'compRatioSlider'],
+].forEach(([valId, sliderId]) => {
+  const numInput = document.getElementById(valId);
+  const slider   = document.getElementById(sliderId);
+
+  // Live update only when value is within bounds (don't fight mid-type)
+  numInput.addEventListener('input', function() {
+    const v = +this.value;
+    if (v >= +slider.min && v <= +slider.max) {
+      slider.value = v;
+      if (sliderId === 'compRatioSlider') state.compRatio = v;
+      render();
+    }
+  });
+
+  // On blur, clamp whatever was left in the field and commit
+  numInput.addEventListener('change', function() {
+    const v = Math.min(+slider.max, Math.max(+slider.min, +this.value));
+    this.value = v;
+    slider.value = v;
+    if (sliderId === 'compRatioSlider') state.compRatio = v;
+    render();
+  });
+});
 
 document.getElementById('rampName').addEventListener('input', () => {
   const out = document.getElementById('export-output');
