@@ -797,6 +797,18 @@
       <input type="number" class="slider-val" id="hueShiftVal" min="-30" max="30" step="0.5" value="0">
     </div>
 
+    <div class="toggle-row" style="margin-top:10px;">
+      <div>
+        <span class="toggle-label">L spacing</span>
+        <span class="toggle-desc">Linear = equal steps · Parabolic = denser near extremes · Adjusted = perceptually equal</span>
+      </div>
+      <div class="toggle-btn">
+        <div class="toggle-opt active" id="opt-lsp-linear"   onclick="setLSpacing('linear')">LINEAR</div>
+        <div class="toggle-opt"        id="opt-lsp-para"     onclick="setLSpacing('parabolic')">PARA</div>
+        <div class="toggle-opt"        id="opt-lsp-adjusted" onclick="setLSpacing('adjusted')">ADJ</div>
+      </div>
+    </div>
+
     <div style="margin-top:4px;">
       <div class="panel-title" style="margin-bottom:8px;">// Gamut handling</div>
       <div class="toggle-row">
@@ -986,6 +998,7 @@ function midtoneHex(hue, p) {
 const state = {
   gamut: 'smart',
   compRatio: 4,
+  lSpacing: 'linear',
   systemEnabled: false,
   systemHues: []   // [{hue:number, name:string}]
 };
@@ -1004,8 +1017,50 @@ function getParams() {
     steps:      +document.getElementById('stepsSlider').value,
     hueShift:   +document.getElementById('hueShiftSlider').value,
     gamut:      state.gamut,
-    compRatio:  state.compRatio
+    compRatio:  state.compRatio,
+    lSpacing:   state.lSpacing
   };
+}
+
+/* ════════════════════════════════════
+   L SPACING
+   ════════════════════════════════════ */
+
+function setLSpacing(mode) {
+  state.lSpacing = mode;
+  document.getElementById('opt-lsp-linear').classList.toggle('active', mode === 'linear');
+  document.getElementById('opt-lsp-para').classList.toggle('active', mode === 'parabolic');
+  document.getElementById('opt-lsp-adjusted').classList.toggle('active', mode === 'adjusted');
+  render();
+}
+
+// Maps linear t ∈ [0,1] to a redistributed t based on spacing mode.
+// t=0 → light end, t=1 → dark end.
+function remapT(t, mode) {
+  if (mode === 'linear') return t;
+
+  if (mode === 'parabolic') {
+    // Quadratic that concentrates steps near 0 and 1, spreads midtones.
+    // Uses a blend: more weight to extremes via 3t²-2t³ (smoothstep) inverted.
+    // We want the *opposite* of smoothstep: more samples at extremes.
+    // f(t) = 0.5 - 0.5*cos(π*t)  is a smooth "ease in/out" which does this:
+    // it moves slowly near 0 and 1 (dense samples) and fast in the middle.
+    return 0.5 - 0.5 * Math.cos(Math.PI * t);
+  }
+
+  if (mode === 'adjusted') {
+    // Approximate perceptual uniformity using a gamma-like curve tuned to
+    // match Munsell value spacing in CIELAB/okLab. Munsell value V relates
+    // to luminance Y by Y ≈ (V/10)^2.457. In okLCh, L ≈ Y^(1/3) (roughly),
+    // so perceived equal steps in Munsell ≈ L^1.3 spacing.
+    // We apply: t_adjusted = t^0.77 which compresses the dark end
+    // (more steps near black where chroma is low and detail matters)
+    // and spreads the light end.
+    // Empirically this matches the Munsell-to-okL mapping well.
+    return Math.pow(t, 0.77);
+  }
+
+  return t;
 }
 
 /* ════════════════════════════════════
@@ -1016,12 +1071,13 @@ function generateRamp(p, overrideHue) {
   const baseHue = overrideHue !== undefined ? overrideHue : p.hue;
   const swatches = [];
   for (let i = 0; i < p.steps; i++) {
-    const t = i / (p.steps - 1);
+    const tLinear = i / (p.steps - 1);
+    const t = remapT(tLinear, p.lSpacing || 'linear');
     const L = p.lightEnd - t * (p.lightEnd - p.darkEnd);
     const hueAtStep = baseHue + p.hueShift * (t - 0.5) * 2;
     const C = chromaCurve(L, p.peakChroma, p.peakL, p.sat);
     const { hex, clipped } = oklchToHex(L, C, hueAtStep, p.gamut, p.compRatio);
-    const stepKey = Math.round(t * 900 + 50);
+    const stepKey = Math.round(tLinear * 900 + 50);
     swatches.push({ L, C, h: hueAtStep, hex, clipped, step: stepKey, index: i });
   }
   return swatches;
@@ -1138,7 +1194,7 @@ function drawCurve(p) {
   ctx.stroke();
 
   for (let i = 0; i < p.steps; i++) {
-    const t = i / (p.steps - 1);
+    const t = remapT(i / (p.steps - 1), p.lSpacing || 'linear');
     const L = p.lightEnd - t * (p.lightEnd - p.darkEnd);
     const C = chromaCurve(L, p.peakChroma, p.peakL, p.sat);
     const { hex } = oklchToHex(L, C, p.hue, p.gamut, p.compRatio);

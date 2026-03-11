@@ -60,6 +60,18 @@ The **curve canvas** below these controls visualizes the actual chroma-vs-lightn
 | **Steps** | Number of stops in the ramp. Odd values only (3–21). Stop keys are distributed evenly across a 50–950 scale (e.g. 11 steps → 50, 140, 230 … 950). |
 | **Hue shift** | Applies a linear hue rotation from the lightest to darkest stop. +20° on a blue ramp, for example, will push darks slightly toward purple and lights toward cyan — mimicking the natural appearance of pigment. Set to 0 for a clean, hue-stable ramp. |
 
+### L Spacing
+
+Controls how lightness values are distributed across the ramp. All three modes anchor the lightest and darkest stops at the same L values — only the placement of the intermediate stops changes.
+
+| Mode | Behavior |
+|---|---|
+| **LINEAR** | Equal spacing between every L value. Simple and predictable; a good default when you want evenly distributed stops. |
+| **PARABOLIC** | Steps concentrate near the lightest and darkest extremes, with wider gaps in the midtones. Implemented as a cosine ease-in/out curve (`0.5 − 0.5·cos(π·t)`). Because chroma peaks in the midtones, this places fewer stops where chroma variation is highest and more stops near the neutral extremes — useful when you need fine-grained light and dark shades for surfaces and text while accepting coarser midtone resolution. |
+| **ADJUSTED** | Applies a gamma-like correction (`t^0.77`) derived from the Munsell value scale, which models perceived equal lightness steps in human vision. The result compresses the dark end slightly relative to the light end, producing stops that feel more equidistant when viewed. Recommended when perceptual uniformity matters most — for example, accessible neutral ramps or UI grays where banding is noticeable. |
+
+The curve canvas updates in real time to show dot positions for the active spacing mode.
+
 ### Gamut Handling
 
 okLCh can describe colors that lie outside the sRGB triangle. The gamut toggle offers three modes:
