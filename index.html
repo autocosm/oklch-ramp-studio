@@ -766,6 +766,36 @@
       <input type="number" class="slider-val" id="peakLVal" min="0.2" max="0.8" step="0.01" value="0.55">
     </div>
 
+    <div class="slider-row">
+      <span class="slider-label">Low shelf</span>
+      <input type="range" id="lowShelfSlider" min="0" max="1" step="0.01" value="0">
+      <input type="number" class="slider-val" id="lowShelfVal" min="0" max="1" step="0.01" value="0">
+    </div>
+
+    <div class="slider-row">
+      <span class="slider-label">High shelf</span>
+      <input type="range" id="highShelfSlider" min="0" max="1" step="0.01" value="0">
+      <input type="number" class="slider-val" id="highShelfVal" min="0" max="1" step="0.01" value="0">
+    </div>
+
+    <div class="slider-row">
+      <span class="slider-label">Bandwidth</span>
+      <input type="range" id="bandwidthSlider" min="0" max="0.6" step="0.01" value="0">
+      <input type="number" class="slider-val" id="bandwidthVal" min="0" max="0.6" step="0.01" value="0">
+    </div>
+
+    <div class="slider-row">
+      <span class="slider-label">Low cut</span>
+      <input type="range" id="lowCutSlider" min="0" max="0.5" step="0.005" value="0">
+      <input type="number" class="slider-val" id="lowCutVal" min="0" max="0.5" step="0.005" value="0">
+    </div>
+
+    <div class="slider-row">
+      <span class="slider-label">High cut</span>
+      <input type="range" id="highCutSlider" min="0.5" max="1" step="0.005" value="1">
+      <input type="number" class="slider-val" id="highCutVal" min="0.5" max="1" step="0.005" value="1">
+    </div>
+
     <canvas id="curve-canvas"></canvas>
   </div>
 
@@ -981,13 +1011,37 @@ function oklchToHex(L, C, h, mode, ratio = 4) {
   return { hex: `#${toH(r)}${toH(g)}${toH(b)}`, clipped };
 }
 
-function chromaCurve(L, peakC, peakL, satMult) {
-  const t = L <= peakL ? L / peakL : (1 - L) / (1 - peakL);
-  return satMult * peakC * Math.sqrt(Math.max(0, t));
+function chromaCurve(L, peakC, peakL, satMult, lowShelf, highShelf, bandwidth, lowCut, highCut) {
+  const lc = lowCut  || 0;
+  const hc = highCut !== undefined ? highCut : 1;
+
+  // Hard zero outside the cut boundaries
+  if (L <= lc || L >= hc) return 0;
+
+  // bandwidth widens the flat chroma peak into a plateau around peakL
+  const halfBw = (bandwidth || 0) / 2;
+  const lo = Math.max(lc + 0.001, peakL - halfBw);  // lower edge of plateau
+  const hi = Math.min(hc - 0.001, peakL + halfBw);  // upper edge of plateau
+
+  let t, p;
+  if (L <= lo) {
+    t = (L - lc) / (lo - lc);
+    // lowShelf 0→1 maps exponent 0.5→0.05: lower exp = steeper shelf near low cut
+    p = 0.5 - 0.45 * (lowShelf || 0);
+  } else if (L >= hi) {
+    t = (hc - L) / (hc - hi);
+    // highShelf 0→1 maps exponent 0.5→0.05: lower exp = steeper shelf near high cut
+    p = 0.5 - 0.45 * (highShelf || 0);
+  } else {
+    t = 1;  // inside the flat plateau
+    p = 1;
+  }
+
+  return satMult * peakC * Math.pow(Math.max(0, t), p);
 }
 
 function midtoneHex(hue, p) {
-  const C = chromaCurve(p.peakL, p.peakChroma, p.peakL, p.sat);
+  const C = chromaCurve(p.peakL, p.peakChroma, p.peakL, p.sat, p.lowShelf, p.highShelf, p.bandwidth, p.lowCut, p.highCut);
   return oklchToHex(p.peakL, C, hue, p.gamut, p.compRatio).hex;
 }
 
@@ -1012,6 +1066,11 @@ function getParams() {
     sat:        +document.getElementById('satSlider').value,
     peakChroma: +document.getElementById('peakChromaSlider').value,
     peakL:      +document.getElementById('peakLSlider').value,
+    lowShelf:   +document.getElementById('lowShelfSlider').value,
+    highShelf:  +document.getElementById('highShelfSlider').value,
+    bandwidth:  +document.getElementById('bandwidthSlider').value,
+    lowCut:     +document.getElementById('lowCutSlider').value,
+    highCut:    +document.getElementById('highCutSlider').value,
     lightEnd:   +document.getElementById('lightEndSlider').value,
     darkEnd:    +document.getElementById('darkEndSlider').value,
     steps:      +document.getElementById('stepsSlider').value,
@@ -1075,7 +1134,7 @@ function generateRamp(p, overrideHue) {
     const t = remapT(tLinear, p.lSpacing || 'linear');
     const L = p.lightEnd - t * (p.lightEnd - p.darkEnd);
     const hueAtStep = baseHue + p.hueShift * (t - 0.5) * 2;
-    const C = chromaCurve(L, p.peakChroma, p.peakL, p.sat);
+    const C = chromaCurve(L, p.peakChroma, p.peakL, p.sat, p.lowShelf, p.highShelf, p.bandwidth, p.lowCut, p.highCut);
     const { hex, clipped } = oklchToHex(L, C, hueAtStep, p.gamut, p.compRatio);
     const stepKey = Math.round(tLinear * 900 + 50);
     swatches.push({ L, C, h: hueAtStep, hex, clipped, step: stepKey, index: i });
@@ -1100,6 +1159,11 @@ function render() {
   syncVal('satVal',        p.sat.toFixed(2));
   syncVal('peakChromaVal', p.peakChroma.toFixed(3));
   syncVal('peakLVal',      p.peakL.toFixed(2));
+  syncVal('lowShelfVal',   p.lowShelf.toFixed(2));
+  syncVal('highShelfVal',  p.highShelf.toFixed(2));
+  syncVal('bandwidthVal',  p.bandwidth.toFixed(2));
+  syncVal('lowCutVal',     p.lowCut.toFixed(3));
+  syncVal('highCutVal',    p.highCut.toFixed(3));
   syncVal('lightEndVal',   p.lightEnd.toFixed(3));
   syncVal('darkEndVal',    p.darkEnd.toFixed(3));
   syncVal('stepsVal',      p.steps);
@@ -1182,12 +1246,36 @@ function drawCurve(p) {
 
   const maxC = 0.38;
 
+  // Shade cut regions (outside low/high cut = hard zero)
+  const lc = p.lowCut  || 0;
+  const hc = p.highCut !== undefined ? p.highCut : 1;
+  ctx.fillStyle = 'rgba(255,255,255,0.03)';
+  if (lc > 0)  ctx.fillRect(0,      0, lc * W,          H);
+  if (hc < 1)  ctx.fillRect(hc * W, 0, (1 - hc) * W,    H);
+
+  // Shade the bandwidth plateau region
+  if ((p.bandwidth || 0) > 0) {
+    const halfBw = p.bandwidth / 2;
+    const lo = Math.max(0.001, p.peakL - halfBw);
+    const hi = Math.min(0.999, p.peakL + halfBw);
+    ctx.fillStyle = 'rgba(139, 124, 248, 0.08)';
+    ctx.fillRect(lo * W, 0, (hi - lo) * W, H);
+  }
+
+  // Vertical cut markers
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  if (lc > 0) { ctx.beginPath(); ctx.moveTo(lc * W, 0); ctx.lineTo(lc * W, H); ctx.stroke(); }
+  if (hc < 1) { ctx.beginPath(); ctx.moveTo(hc * W, 0); ctx.lineTo(hc * W, H); ctx.stroke(); }
+  ctx.setLineDash([]);
+
   ctx.beginPath();
   ctx.strokeStyle = '#8b7cf8';
   ctx.lineWidth = 1.5;
   for (let i = 0; i <= W; i++) {
     const L = i / W;
-    const C = chromaCurve(L, p.peakChroma, p.peakL, p.sat);
+    const C = chromaCurve(L, p.peakChroma, p.peakL, p.sat, p.lowShelf, p.highShelf, p.bandwidth, p.lowCut, p.highCut);
     const y = H - (C / maxC) * H;
     i === 0 ? ctx.moveTo(i, y) : ctx.lineTo(i, y);
   }
@@ -1196,7 +1284,7 @@ function drawCurve(p) {
   for (let i = 0; i < p.steps; i++) {
     const t = remapT(i / (p.steps - 1), p.lSpacing || 'linear');
     const L = p.lightEnd - t * (p.lightEnd - p.darkEnd);
-    const C = chromaCurve(L, p.peakChroma, p.peakL, p.sat);
+    const C = chromaCurve(L, p.peakChroma, p.peakL, p.sat, p.lowShelf, p.highShelf, p.bandwidth, p.lowCut, p.highCut);
     const { hex } = oklchToHex(L, C, p.hue, p.gamut, p.compRatio);
     const x = L * W, y = H - (C / maxC) * H;
     ctx.beginPath();
@@ -1466,6 +1554,11 @@ document.getElementById('sysCountSlider').addEventListener('input', syncSystemHu
   ['satVal',        'satSlider'],
   ['peakChromaVal', 'peakChromaSlider'],
   ['peakLVal',      'peakLSlider'],
+  ['lowShelfVal',   'lowShelfSlider'],
+  ['highShelfVal',  'highShelfSlider'],
+  ['bandwidthVal',  'bandwidthSlider'],
+  ['lowCutVal',     'lowCutSlider'],
+  ['highCutVal',    'highCutSlider'],
   ['lightEndVal',   'lightEndSlider'],
   ['darkEndVal',    'darkEndSlider'],
   ['stepsVal',      'stepsSlider'],
