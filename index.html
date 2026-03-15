@@ -86,6 +86,12 @@
   .ramp-name-input::placeholder { color: var(--muted); }
 
   /* ── SWATCH DISPLAY ── */
+  #ramp-display {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
   #swatch-row {
     display: flex;
     height: clamp(80px, 16vw, 150px);
@@ -748,6 +754,11 @@
         <input type="range" id="peakLSlider" min="0.2" max="0.8" step="0.01" value="0.55">
         <input type="number" class="slider-val" id="peakLVal" min="0.2" max="0.8" step="0.01" value="0.55">
       </div>
+      <div class="slider-row">
+        <span class="slider-label">Peak Q</span>
+        <input type="range" id="peakQSlider" min="0.5" max="4" step="0.05" value="1">
+        <input type="number" class="slider-val" id="peakQVal" min="0.5" max="4" step="0.05" value="1">
+      </div>
     </div>
 
     <div class="node-controls" data-node="3" hidden>
@@ -1034,15 +1045,17 @@ function buildMonotoneCubicSpline(xs, ys) {
   };
 }
 
-function chromaCurve(L, peakC, peakL, satMult, lKneeL, lKneeC, rKneeL, rKneeC, darkEndL, lightEndL) {
+function chromaCurve(L, peakC, peakL, satMult, lKneeL, lKneeC, rKneeL, rKneeC, darkEndL, lightEndL, peakQ = 1) {
   if (L <= darkEndL || L >= lightEndL) return 0;
-  const xs = [darkEndL, Math.min(lKneeL, peakL - 0.001), peakL, Math.max(rKneeL, peakL + 0.001), lightEndL];
+  const effL = Math.max(darkEndL + 0.01, peakL - (peakL - lKneeL) / peakQ);
+  const effR = Math.min(lightEndL - 0.01, peakL + (rKneeL - peakL) / peakQ);
+  const xs = [darkEndL, Math.min(effL, peakL - 0.001), peakL, Math.max(effR, peakL + 0.001), lightEndL];
   const ys = [0, Math.max(0, lKneeC), peakC, Math.max(0, rKneeC), 0];
   return satMult * Math.max(0, buildMonotoneCubicSpline(xs, ys)(L));
 }
 
 function midtoneHex(hue, p) {
-  const C = chromaCurve(p.peakL, p.peakChroma, p.peakL, p.sat, p.lKneeL, p.lKneeC, p.rKneeL, p.rKneeC, p.curveDark, p.curveLight);
+  const C = chromaCurve(p.peakL, p.peakChroma, p.peakL, p.sat, p.lKneeL, p.lKneeC, p.rKneeL, p.rKneeC, p.curveDark, p.curveLight, p.peakQ);
   return oklchToHex(p.peakL, C, hue, p.gamut, p.compRatio).hex;
 }
 
@@ -1084,6 +1097,7 @@ function getParams() {
     rKneeC:     +document.getElementById('rKneeCSlider').value,
     curveLight: +document.getElementById('curveLightSlider').value,
     curveDark:  +document.getElementById('curveDarkSlider').value,
+    peakQ:      +document.getElementById('peakQSlider').value,
     rampLight:  +document.getElementById('lightEndSlider').value,
     rampDark:   +document.getElementById('darkEndSlider').value,
     steps:      +document.getElementById('stepsSlider').value,
@@ -1141,7 +1155,9 @@ function remapT(t, mode) {
 
 function generateRamp(p, overrideHue) {
   const baseHue = overrideHue !== undefined ? overrideHue : p.hue;
-  const xs = [p.curveDark, Math.min(p.lKneeL, p.peakL - 0.001), p.peakL, Math.max(p.rKneeL, p.peakL + 0.001), p.curveLight];
+  const effL = Math.max(p.curveDark + 0.01, p.peakL - (p.peakL - p.lKneeL) / p.peakQ);
+  const effR = Math.min(p.curveLight - 0.01, p.peakL + (p.rKneeL - p.peakL) / p.peakQ);
+  const xs = [p.curveDark, Math.min(effL, p.peakL - 0.001), p.peakL, Math.max(effR, p.peakL + 0.001), p.curveLight];
   const ys = [0, Math.max(0, p.lKneeC), p.peakChroma, Math.max(0, p.rKneeC), 0];
   const spline = buildMonotoneCubicSpline(xs, ys);
   const swatches = [];
@@ -1175,6 +1191,7 @@ function render() {
   syncVal('satVal',        p.sat.toFixed(2));
   syncVal('peakChromaVal', p.peakChroma.toFixed(3));
   syncVal('peakLVal',      p.peakL.toFixed(2));
+  syncVal('peakQVal',      p.peakQ.toFixed(2));
   syncVal('lKneeLVal',     p.lKneeL.toFixed(2));
   syncVal('lKneeCVal',     p.lKneeC.toFixed(3));
   syncVal('rKneeLVal',     p.rKneeL.toFixed(2));
@@ -1248,7 +1265,9 @@ function drawCurve(p) {
   ctx.fillRect(0, 0, W, H);
 
   const maxC = 0.38;
-  const xs = [p.curveDark, Math.min(p.lKneeL, p.peakL - 0.001), p.peakL, Math.max(p.rKneeL, p.peakL + 0.001), p.curveLight];
+  const effL = Math.max(p.curveDark + 0.01, p.peakL - (p.peakL - p.lKneeL) / p.peakQ);
+  const effR = Math.min(p.curveLight - 0.01, p.peakL + (p.rKneeL - p.peakL) / p.peakQ);
+  const xs = [p.curveDark, Math.min(effL, p.peakL - 0.001), p.peakL, Math.max(effR, p.peakL + 0.001), p.curveLight];
   const ys = [0, Math.max(0, p.lKneeC), p.peakChroma, Math.max(0, p.rKneeC), 0];
   const spline = buildMonotoneCubicSpline(xs, ys);
 
@@ -1394,6 +1413,22 @@ function drawCurve(p) {
     ctx.fillText(label, x - tw / 2, labelY);
   });
 
+  // Q bandwidth tick marks — visible when Peak node is selected
+  if (curveEditor.selectedNodeIdx === 2) {
+    const tickH = 10;
+    for (const tickL of [effL, effR]) {
+      const tx = tickL * W;
+      const C = p.sat * Math.max(0, spline(tickL));
+      const ty = H - (C / maxC) * H;
+      ctx.beginPath();
+      ctx.moveTo(tx, ty - tickH);
+      ctx.lineTo(tx, ty + tickH);
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  }
+
   ctx.fillStyle = '#5a5a88';
   ctx.font = `9px 'IBM Plex Mono', monospace`;
   ctx.fillText('C ↑', 4, 10);
@@ -1471,11 +1506,13 @@ function initCurveEditor() {
     const p = getParams();
     const W = canvas.offsetWidth, H = canvas.offsetHeight;
     const maxC = 0.38;
+    const effL = Math.max(p.curveDark + 0.01, p.peakL - (p.peakL - p.lKneeL) / p.peakQ);
+    const effR = Math.min(p.curveLight - 0.01, p.peakL + (p.rKneeL - p.peakL) / p.peakQ);
     const nodeCoords = [
       { L: p.curveDark,  C: 0 },
-      { L: p.lKneeL,     C: p.lKneeC },
+      { L: effL,         C: p.lKneeC },
       { L: p.peakL,      C: p.peakChroma },
-      { L: p.rKneeL,     C: p.rKneeC },
+      { L: effR,         C: p.rKneeC },
       { L: p.curveLight, C: 0 },
     ];
     for (let i = 0; i < nodeCoords.length; i++) {
@@ -1836,6 +1873,7 @@ document.getElementById('sysCountSlider').addEventListener('input', syncSystemHu
   ['satVal',        'satSlider'],
   ['peakChromaVal', 'peakChromaSlider'],
   ['peakLVal',      'peakLSlider'],
+  ['peakQVal',      'peakQSlider'],
   ['lKneeLVal',     'lKneeLSlider'],
   ['lKneeCVal',     'lKneeCSlider'],
   ['rKneeLVal',     'rKneeLSlider'],

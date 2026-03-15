@@ -64,7 +64,7 @@ A full-width interactive editor that sits above the control panels and serves as
 |---|---|
 | **Dark** | Curve dark |
 | **L-Knee** | L-Knee L, L-Knee C |
-| **Peak** | Chroma Peak, Peak at L |
+| **Peak** | Chroma Peak, Peak at L, Peak Q |
 | **R-Knee** | R-Knee L, R-Knee C |
 | **Light** | Curve light |
 
@@ -75,7 +75,7 @@ A full-width interactive editor that sits above the control panels and serves as
 | **Hue** | Base hue angle in degrees (0–360). The slider track renders a live perceptual hue gradient. |
 | **Saturation** | A multiplier applied to the entire chroma curve. 1.0 = curve as-is; values below 1 produce more neutral/muted ramps; values above 1 push toward maximum chroma. |
 
-The remaining chroma curve controls (**Chroma Peak**, **Peak at L**, **L-Knee L/C**, **R-Knee L/C**, **Curve dark**, **Curve light**) appear in the node panel when the corresponding canvas node is selected — see above.
+The remaining chroma curve controls (**Chroma Peak**, **Peak at L**, **Peak Q**, **L-Knee L/C**, **R-Knee L/C**, **Curve dark**, **Curve light**) appear in the node panel when the corresponding canvas node is selected — see above.
 
 ### Lightness Range & Steps
 
@@ -219,7 +219,7 @@ The curve is computed using the **Fritsch-Carlson monotone cubic Hermite spline*
 |---|---|
 | **Dark anchor** | Fixed at `(curveDark, 0)` — the lightness at which chroma reaches zero on the dark side. |
 | **L-Knee** | `(L-Knee L, L-Knee C)` — shapes how quickly chroma rises from the dark anchor toward the peak. A low L position steepens the initial rise; a high C value broadens the dark shoulder. |
-| **Peak** | `(Peak at L, Chroma Peak)` — the chroma apex, scaled by Saturation. |
+| **Peak** | `(Peak at L, Chroma Peak)` — the chroma apex, scaled by Saturation. **Peak Q** controls the bandwidth: how quickly chroma falls off on either side of the peak. Q = 1.0 is neutral (knee positions unchanged). Higher Q pulls the effective knee positions closer to the peak, sharpening the rolloff; lower Q pushes them farther apart, broadening it. The knee slider values are not modified — Q is applied internally when computing the spline. When the Peak node is selected, two tick marks on the canvas show the current effective bandwidth edges. |
 | **R-Knee** | `(R-Knee L, R-Knee C)` — shapes the descent from peak toward the light anchor. Mirrors the role of the left knee on the light side. |
 | **Light anchor** | Fixed at `(curveLight, 0)` — the lightness at which chroma reaches zero on the light side. |
 
