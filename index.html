@@ -88,7 +88,7 @@
   /* ── SWATCH DISPLAY ── */
   #swatch-row {
     display: flex;
-    height: clamp(110px, 22vw, 200px);
+    height: clamp(80px, 16vw, 150px);
     overflow: hidden;
   }
 
@@ -96,16 +96,13 @@
     flex: 1;
     position: relative;
     cursor: pointer;
-    transition: flex 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     overflow: hidden;
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
     align-items: center;
-    padding-bottom: 10px;
+    padding-bottom: 8px;
   }
-
-  .swatch:hover { flex: 2; }
 
   .swatch-label {
     font-family: 'IBM Plex Mono', monospace;
@@ -114,12 +111,8 @@
     text-transform: uppercase;
     writing-mode: vertical-lr;
     transform: rotate(180deg);
-    opacity: 0;
-    transition: opacity 0.2s;
     pointer-events: none;
   }
-
-  .swatch:hover .swatch-label { opacity: 1; }
 
   .swatch-step-num {
     position: absolute;
@@ -134,46 +127,6 @@
 
   .swatch:hover .swatch-step-num { opacity: 0.8; }
 
-  /* ── HEX STRIP ── */
-  #hex-strip {
-    display: flex;
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  #hex-strip::-webkit-scrollbar { display: none; }
-
-  .hex-cell {
-    flex: 1;
-    min-width: 64px;
-    padding: 8px 6px;
-    text-align: center;
-    border-right: 1px solid var(--border);
-    cursor: pointer;
-    transition: background 0.15s;
-    position: relative;
-  }
-
-  .hex-cell:last-child { border-right: none; }
-  .hex-cell:hover { background: var(--surface); }
-
-  .hex-val {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px;
-    color: var(--muted);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    display: block;
-  }
-
-  .hex-swatch-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    margin: 0 auto 4px;
-  }
 
   .copy-toast {
     position: fixed;
@@ -433,6 +386,15 @@
     padding: 18px 20px;
     border-bottom: 1px solid var(--border);
   }
+
+  /* ── NODE CONTROL PANEL ── */
+  #node-panel {
+    grid-column: 1 / -1;
+    padding: 12px 20px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .node-controls[hidden] { display: none; }
 
   /* ── SCROLLBAR ── */
   ::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -696,7 +658,6 @@
   }
 
   .sys-swatch:last-child { border-right: none; }
-  .sys-swatch:hover { flex: 2.5; }
 
   /* Hover tooltip */
   .sys-swatch::after {
@@ -741,7 +702,6 @@
 
 <div id="ramp-display">
   <div id="swatch-row"></div>
-  <div id="hex-strip"></div>
 </div>
 
 <div id="controls">
@@ -750,6 +710,66 @@
   <div class="curve-panel">
     <div class="panel-title">// Chroma Curve</div>
     <canvas id="curve-canvas"></canvas>
+  </div>
+
+  <!-- Node control panel — appears when a curve node is selected -->
+  <div id="node-panel" hidden>
+    <div class="panel-title" id="node-panel-title">// Peak</div>
+
+    <div class="node-controls" data-node="0" hidden>
+      <div class="slider-row">
+        <span class="slider-label">Curve dark</span>
+        <input type="range" id="curveDarkSlider" min="0.01" max="0.35" step="0.005" value="0.12">
+        <input type="number" class="slider-val" id="curveDarkVal" min="0.01" max="0.35" step="0.005" value="0.12">
+      </div>
+    </div>
+
+    <div class="node-controls" data-node="1" hidden>
+      <div class="slider-row">
+        <span class="slider-label">L-Knee L</span>
+        <input type="range" id="lKneeLSlider" min="0.05" max="0.7" step="0.01" value="0.25">
+        <input type="number" class="slider-val" id="lKneeLVal" min="0.05" max="0.7" step="0.01" value="0.25">
+      </div>
+      <div class="slider-row">
+        <span class="slider-label">L-Knee C</span>
+        <input type="range" id="lKneeCSlider" min="0" max="0.38" step="0.005" value="0.12">
+        <input type="number" class="slider-val" id="lKneeCVal" min="0" max="0.38" step="0.005" value="0.12">
+      </div>
+    </div>
+
+    <div class="node-controls" data-node="2" hidden>
+      <div class="slider-row">
+        <span class="slider-label">Chroma Peak</span>
+        <input type="range" id="peakChromaSlider" min="0.05" max="0.38" step="0.005" value="0.18">
+        <input type="number" class="slider-val" id="peakChromaVal" min="0.05" max="0.38" step="0.005" value="0.18">
+      </div>
+      <div class="slider-row">
+        <span class="slider-label">Peak at L</span>
+        <input type="range" id="peakLSlider" min="0.2" max="0.8" step="0.01" value="0.55">
+        <input type="number" class="slider-val" id="peakLVal" min="0.2" max="0.8" step="0.01" value="0.55">
+      </div>
+    </div>
+
+    <div class="node-controls" data-node="3" hidden>
+      <div class="slider-row">
+        <span class="slider-label">R-Knee L</span>
+        <input type="range" id="rKneeLSlider" min="0.3" max="0.98" step="0.01" value="0.80">
+        <input type="number" class="slider-val" id="rKneeLVal" min="0.3" max="0.98" step="0.01" value="0.80">
+      </div>
+      <div class="slider-row">
+        <span class="slider-label">R-Knee C</span>
+        <input type="range" id="rKneeCSlider" min="0" max="0.38" step="0.005" value="0.12">
+        <input type="number" class="slider-val" id="rKneeCVal" min="0" max="0.38" step="0.005" value="0.12">
+      </div>
+    </div>
+
+    <div class="node-controls" data-node="4" hidden>
+      <div class="slider-row">
+        <span class="slider-label">Curve light</span>
+        <input type="range" id="curveLightSlider" min="0.75" max="0.99" step="0.005" value="0.97">
+        <input type="number" class="slider-val" id="curveLightVal" min="0.75" max="0.99" step="0.005" value="0.97">
+      </div>
+    </div>
   </div>
 
   <!-- Hue & Chroma -->
@@ -766,54 +786,6 @@
       <span class="slider-label">Saturation</span>
       <input type="range" id="satSlider" min="0" max="2" step="0.01" value="1">
       <input type="number" class="slider-val" id="satVal" min="0" max="2" step="0.01" value="1">
-    </div>
-
-    <div class="slider-row">
-      <span class="slider-label">Chroma Peak</span>
-      <input type="range" id="peakChromaSlider" min="0.05" max="0.38" step="0.005" value="0.18">
-      <input type="number" class="slider-val" id="peakChromaVal" min="0.05" max="0.38" step="0.005" value="0.18">
-    </div>
-
-    <div class="slider-row">
-      <span class="slider-label">Peak at L</span>
-      <input type="range" id="peakLSlider" min="0.2" max="0.8" step="0.01" value="0.55">
-      <input type="number" class="slider-val" id="peakLVal" min="0.2" max="0.8" step="0.01" value="0.55">
-    </div>
-
-    <div class="slider-row">
-      <span class="slider-label">L-Knee L</span>
-      <input type="range" id="lKneeLSlider" min="0.05" max="0.7" step="0.01" value="0.25">
-      <input type="number" class="slider-val" id="lKneeLVal" min="0.05" max="0.7" step="0.01" value="0.25">
-    </div>
-
-    <div class="slider-row">
-      <span class="slider-label">L-Knee C</span>
-      <input type="range" id="lKneeCSlider" min="0" max="0.38" step="0.005" value="0.12">
-      <input type="number" class="slider-val" id="lKneeCVal" min="0" max="0.38" step="0.005" value="0.12">
-    </div>
-
-    <div class="slider-row">
-      <span class="slider-label">R-Knee L</span>
-      <input type="range" id="rKneeLSlider" min="0.3" max="0.98" step="0.01" value="0.80">
-      <input type="number" class="slider-val" id="rKneeLVal" min="0.3" max="0.98" step="0.01" value="0.80">
-    </div>
-
-    <div class="slider-row">
-      <span class="slider-label">R-Knee C</span>
-      <input type="range" id="rKneeCSlider" min="0" max="0.38" step="0.005" value="0.12">
-      <input type="number" class="slider-val" id="rKneeCVal" min="0" max="0.38" step="0.005" value="0.12">
-    </div>
-
-    <div class="slider-row">
-      <span class="slider-label">Curve dark</span>
-      <input type="range" id="curveDarkSlider" min="0.01" max="0.35" step="0.005" value="0.12">
-      <input type="number" class="slider-val" id="curveDarkVal" min="0.01" max="0.35" step="0.005" value="0.12">
-    </div>
-
-    <div class="slider-row">
-      <span class="slider-label">Curve light</span>
-      <input type="range" id="curveLightSlider" min="0.75" max="0.99" step="0.005" value="0.97">
-      <input type="number" class="slider-val" id="curveLightVal" min="0.75" max="0.99" step="0.005" value="0.97">
     </div>
 
   </div>
@@ -1094,9 +1066,10 @@ const HUE_OFFSETS = [120, 240, 60, 180, 300, 30, 150, 270, 90, 210, 330];
    ════════════════════════════════════ */
 
 const curveEditor = {
-  dragNodeIdx:  null,  // 0–4 while dragging, null otherwise
-  hoverNodeIdx: null,  // 0–4 while hovering, null otherwise
-  HIT_RADIUS: 18,      // CSS-pixel radius for hit detection
+  dragNodeIdx:    null,  // 0–4 while dragging, null otherwise
+  hoverNodeIdx:   null,  // 0–4 while hovering, null otherwise
+  selectedNodeIdx: null, // 0–4 when a node is selected (clicked), null otherwise
+  HIT_RADIUS: 18,        // CSS-pixel radius for hit detection
 };
 
 function getParams() {
@@ -1231,20 +1204,6 @@ function render() {
     row.appendChild(el);
   });
 
-  // Hex strip
-  const strip = document.getElementById('hex-strip');
-  strip.innerHTML = '';
-  [...swatches].reverse().forEach(s => {
-    const cell = document.createElement('div');
-    cell.className = 'hex-cell';
-    cell.innerHTML = `
-      <div class="hex-swatch-dot" style="background:${s.hex}"></div>
-      <span class="hex-val">${s.hex}</span>
-    `;
-    cell.onclick = () => copyText(s.hex);
-    strip.appendChild(cell);
-  });
-
   // Gamut chips
   const gamutBar = document.getElementById('gamutBar');
   gamutBar.innerHTML = '';
@@ -1372,9 +1331,10 @@ function drawCurve(p) {
   knots.forEach(({ L, C, label, axisOnly }, i) => {
     const x = L * W;
     const y = H - (C / maxC) * H;
-    const isActive = (curveEditor.dragNodeIdx === i);
-    const isHovered = (curveEditor.dragNodeIdx === null && curveEditor.hoverNodeIdx === i);
-    const isEngaged = isActive || isHovered;
+    const isActive   = (curveEditor.dragNodeIdx === i);
+    const isHovered  = (curveEditor.dragNodeIdx === null && curveEditor.hoverNodeIdx === i);
+    const isSelected = (curveEditor.selectedNodeIdx === i);
+    const isEngaged  = isActive || isHovered;
 
     if (axisOnly === 'L') {
       // Vertical bar: signals L-only movement
@@ -1395,6 +1355,12 @@ function drawCurve(p) {
         ctx.strokeStyle = isActive ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.4)';
         ctx.lineWidth = 1.5;
         ctx.stroke();
+      } else if (isSelected) {
+        ctx.beginPath();
+        ctx.arc(x, y, 16, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
       }
     } else {
       // Full 2D circle node
@@ -1413,12 +1379,18 @@ function drawCurve(p) {
         ctx.strokeStyle = isActive ? 'rgba(139,124,248,0.5)' : 'rgba(139,124,248,0.3)';
         ctx.lineWidth = 2;
         ctx.stroke();
+      } else if (isSelected) {
+        ctx.beginPath();
+        ctx.arc(x, y, 18, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(139,124,248,0.45)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
       }
     }
 
     const tw = ctx.measureText(label).width;
     const labelY = y - 18 > 10 ? y - 18 : y + 24;
-    ctx.fillStyle = isEngaged ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.55)';
+    ctx.fillStyle = isEngaged ? 'rgba(255,255,255,0.9)' : isSelected ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.55)';
     ctx.fillText(label, x - tw / 2, labelY);
   });
 
@@ -1426,6 +1398,29 @@ function drawCurve(p) {
   ctx.font = `9px 'IBM Plex Mono', monospace`;
   ctx.fillText('C ↑', 4, 10);
   ctx.fillText('0.10 →', 4, H - 4);
+}
+
+/* ════════════════════════════════════
+   NODE PANEL — contextual controls
+   ════════════════════════════════════ */
+
+function updateNodePanel() {
+  const panel = document.getElementById('node-panel');
+  const title = document.getElementById('node-panel-title');
+  const idx = curveEditor.selectedNodeIdx;
+  const nodeLabels = ['// Dark', '// L-Knee', '// Peak', '// R-Knee', '// Light'];
+
+  document.querySelectorAll('.node-controls').forEach(g => { g.hidden = true; });
+
+  if (idx === null) {
+    panel.hidden = true;
+    return;
+  }
+
+  panel.hidden = false;
+  title.textContent = nodeLabels[idx];
+  const group = panel.querySelector(`.node-controls[data-node="${idx}"]`);
+  if (group) group.hidden = false;
 }
 
 /* ════════════════════════════════════
@@ -1523,10 +1518,13 @@ function initCurveEditor() {
     if (e.button !== 0) return;
     const { x, y } = getCSSCoords(e);
     const hit = hitTest(x, y);
-    if (hit === -1) return;
+    curveEditor.selectedNodeIdx = hit !== -1 ? hit : null;
+    updateNodePanel();
+    if (hit === -1) { drawCurve(getParams()); return; }
     e.preventDefault();
     curveEditor.dragNodeIdx = hit;
     canvas.style.cursor = 'grabbing';
+    drawCurve(getParams());
   });
 
   window.addEventListener('mousemove', function(e) {
@@ -1566,9 +1564,12 @@ function initCurveEditor() {
   canvas.addEventListener('touchstart', function(e) {
     const { x, y } = getCSSCoords(e);
     const hit = hitTest(x, y);
-    if (hit === -1) return;
+    curveEditor.selectedNodeIdx = hit !== -1 ? hit : null;
+    updateNodePanel();
+    if (hit === -1) { drawCurve(getParams()); return; }
     e.preventDefault();
     curveEditor.dragNodeIdx = hit;
+    drawCurve(getParams());
   }, { passive: false });
 
   canvas.addEventListener('touchmove', function(e) {

@@ -34,7 +34,7 @@ A **DARK / LIGHT** toggle in the header switches the entire page chrome — all 
 
 ### Ramp Display
 
-The hero swatch row and hex strip at the top render **dark to light, left to right** — matching the X axis of the curve canvas below, where L = 0 (black) is on the left and L = 1 (white) is on the right. Click or tap any swatch to copy its hex value to the clipboard.
+The hero swatch row at the top renders **dark to light, left to right** — matching the X axis of the curve canvas below, where L = 0 (black) is on the left and L = 1 (white) is on the right. Each swatch displays its hex value persistently, oriented vertically. Click or tap any swatch to copy its hex value to the clipboard.
 
 ---
 
@@ -58,7 +58,15 @@ A full-width interactive editor that sits above the control panels and serves as
 | **R-Knee** | Circle | L and C | Controls the descent from the peak toward the light anchor. Mirrors L-Knee on the light side. |
 | **Light** | Circle with vertical bar | L only | Sets the light anchor of the chroma spline. Horizontal drag only. |
 
-Sliders in the panels below remain active as precision secondary controls and stay in sync with the canvas at all times.
+**Selecting nodes:** Click any node to select it. A contextual panel appears directly below the canvas showing precision slider and number controls for that node's parameters only. Click an empty area of the canvas to dismiss the panel. Drag interaction and selection work simultaneously — dragging a node also selects it.
+
+| Node selected | Controls shown |
+|---|---|
+| **Dark** | Curve dark |
+| **L-Knee** | L-Knee L, L-Knee C |
+| **Peak** | Chroma Peak, Peak at L |
+| **R-Knee** | R-Knee L, R-Knee C |
+| **Light** | Curve light |
 
 ### Hue & Chroma
 
@@ -66,14 +74,8 @@ Sliders in the panels below remain active as precision secondary controls and st
 |---|---|
 | **Hue** | Base hue angle in degrees (0–360). The slider track renders a live perceptual hue gradient. |
 | **Saturation** | A multiplier applied to the entire chroma curve. 1.0 = curve as-is; values below 1 produce more neutral/muted ramps; values above 1 push toward maximum chroma. |
-| **Chroma Peak** | The maximum chroma value reached at the apex of the curve. Higher values produce more vivid mid-tones. |
-| **Peak at L** | The lightness value at which chroma peaks. 0.55 biases the most vivid color slightly above mid-gray, which tends to feel natural. Shift toward 0.3–0.4 for ramps that pop in dark UI; toward 0.6–0.7 for light UI. |
-| **L-Knee L** | Lightness position of the left knee — the intermediate control point between the dark anchor and the peak. Moving it closer to the dark end steepens the initial rise; moving it closer to the peak produces a more gradual ramp up. |
-| **L-Knee C** | Chroma at the left knee. Higher values pull the curve upward on the dark side, creating a fuller shoulder; lower values keep it lean near the dark anchor. |
-| **R-Knee L** | Lightness position of the right knee — the intermediate control point between the peak and the light anchor. Moving it closer to the peak steepens the descent; moving it toward the light end produces a long, gradual tail. |
-| **R-Knee C** | Chroma at the right knee. Controls the fullness of the curve's light-side shoulder, mirroring the role of L-Knee C on the dark side. |
-| **Curve dark** | The lightness value at which the chroma spline is anchored to zero on the dark side. This is independent of the ramp's darkest stop — the ramp can extend darker or lighter than this anchor. Also draggable as the **Dark** node on the canvas. |
-| **Curve light** | The lightness value at which the chroma spline is anchored to zero on the light side. Independent of the ramp's lightest stop. Also draggable as the **Light** node on the canvas. |
+
+The remaining chroma curve controls (**Chroma Peak**, **Peak at L**, **L-Knee L/C**, **R-Knee L/C**, **Curve dark**, **Curve light**) appear in the node panel when the corresponding canvas node is selected — see above.
 
 ### Lightness Range & Steps
 
@@ -126,7 +128,7 @@ Disabled by default. When toggled **ON**, reveals a two-part interface for visua
 
 A full-width ramp grid rendered below the controls. Each row represents one ramp — the primary (marked with an accent border) appears first, followed by additional hues in card order. All rows share the same lightness range, step count, chroma curve, hue shift, and gamut mode as the primary, so every ramp is directly comparable on those axes; only the base hue differs.
 
-Column headers show step keys. Hover any swatch cell to see its hex value in a tooltip; click to copy it to the clipboard.
+Column headers show step keys. Hover any swatch cell to see its hex value in a tooltip; click to copy it to the clipboard. Swatch cells do not expand on hover.
 
 ---
 
