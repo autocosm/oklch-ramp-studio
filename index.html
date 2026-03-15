@@ -767,33 +767,27 @@
     </div>
 
     <div class="slider-row">
-      <span class="slider-label">Low shelf</span>
-      <input type="range" id="lowShelfSlider" min="0" max="1" step="0.01" value="0">
-      <input type="number" class="slider-val" id="lowShelfVal" min="0" max="1" step="0.01" value="0">
+      <span class="slider-label">L-Knee L</span>
+      <input type="range" id="lKneeLSlider" min="0.05" max="0.7" step="0.01" value="0.25">
+      <input type="number" class="slider-val" id="lKneeLVal" min="0.05" max="0.7" step="0.01" value="0.25">
     </div>
 
     <div class="slider-row">
-      <span class="slider-label">High shelf</span>
-      <input type="range" id="highShelfSlider" min="0" max="1" step="0.01" value="0">
-      <input type="number" class="slider-val" id="highShelfVal" min="0" max="1" step="0.01" value="0">
+      <span class="slider-label">L-Knee C</span>
+      <input type="range" id="lKneeCSlider" min="0" max="0.38" step="0.005" value="0.12">
+      <input type="number" class="slider-val" id="lKneeCVal" min="0" max="0.38" step="0.005" value="0.12">
     </div>
 
     <div class="slider-row">
-      <span class="slider-label">Bandwidth</span>
-      <input type="range" id="bandwidthSlider" min="0" max="0.6" step="0.01" value="0">
-      <input type="number" class="slider-val" id="bandwidthVal" min="0" max="0.6" step="0.01" value="0">
+      <span class="slider-label">R-Knee L</span>
+      <input type="range" id="rKneeLSlider" min="0.3" max="0.98" step="0.01" value="0.80">
+      <input type="number" class="slider-val" id="rKneeLVal" min="0.3" max="0.98" step="0.01" value="0.80">
     </div>
 
     <div class="slider-row">
-      <span class="slider-label">Low cut</span>
-      <input type="range" id="lowCutSlider" min="0" max="0.5" step="0.005" value="0">
-      <input type="number" class="slider-val" id="lowCutVal" min="0" max="0.5" step="0.005" value="0">
-    </div>
-
-    <div class="slider-row">
-      <span class="slider-label">High cut</span>
-      <input type="range" id="highCutSlider" min="0.5" max="1" step="0.005" value="1">
-      <input type="number" class="slider-val" id="highCutVal" min="0.5" max="1" step="0.005" value="1">
+      <span class="slider-label">R-Knee C</span>
+      <input type="range" id="rKneeCSlider" min="0" max="0.38" step="0.005" value="0.12">
+      <input type="number" class="slider-val" id="rKneeCVal" min="0" max="0.38" step="0.005" value="0.12">
     </div>
 
     <canvas id="curve-canvas"></canvas>
@@ -1011,37 +1005,47 @@ function oklchToHex(L, C, h, mode, ratio = 4) {
   return { hex: `#${toH(r)}${toH(g)}${toH(b)}`, clipped };
 }
 
-function chromaCurve(L, peakC, peakL, satMult, lowShelf, highShelf, bandwidth, lowCut, highCut) {
-  const lc = lowCut  || 0;
-  const hc = highCut !== undefined ? highCut : 1;
-
-  // Hard zero outside the cut boundaries
-  if (L <= lc || L >= hc) return 0;
-
-  // bandwidth widens the flat chroma peak into a plateau around peakL
-  const halfBw = (bandwidth || 0) / 2;
-  const lo = Math.max(lc + 0.001, peakL - halfBw);  // lower edge of plateau
-  const hi = Math.min(hc - 0.001, peakL + halfBw);  // upper edge of plateau
-
-  let t, p;
-  if (L <= lo) {
-    t = (L - lc) / (lo - lc);
-    // lowShelf 0→1 maps exponent 0.5→0.05: lower exp = steeper shelf near low cut
-    p = 0.5 - 0.45 * (lowShelf || 0);
-  } else if (L >= hi) {
-    t = (hc - L) / (hc - hi);
-    // highShelf 0→1 maps exponent 0.5→0.05: lower exp = steeper shelf near high cut
-    p = 0.5 - 0.45 * (highShelf || 0);
-  } else {
-    t = 1;  // inside the flat plateau
-    p = 1;
+function buildMonotoneCubicSpline(xs, ys) {
+  const n = xs.length;
+  const d = [];
+  for (let i = 0; i < n - 1; i++) {
+    d[i] = (ys[i + 1] - ys[i]) / (xs[i + 1] - xs[i]);
   }
+  const m = new Array(n);
+  m[0] = d[0];
+  m[n - 1] = d[n - 2];
+  for (let i = 1; i < n - 1; i++) {
+    m[i] = (d[i - 1] + d[i]) / 2;
+  }
+  for (let i = 0; i < n - 1; i++) {
+    if (d[i] === 0) { m[i] = 0; m[i + 1] = 0; }
+    else {
+      const a = m[i] / d[i], b = m[i + 1] / d[i];
+      const h = Math.hypot(a, b);
+      if (h > 3) { m[i] = (a / h) * 3 * d[i]; m[i + 1] = (b / h) * 3 * d[i]; }
+    }
+  }
+  return function(x) {
+    if (x <= xs[0]) return ys[0];
+    if (x >= xs[n - 1]) return ys[n - 1];
+    let lo = 0, hi = n - 2;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (xs[mid] < x) lo = mid + 1; else hi = mid; }
+    const i = lo > 0 ? lo - 1 : 0;
+    const hh = xs[i + 1] - xs[i], t = (x - xs[i]) / hh;
+    const t2 = t * t, t3 = t2 * t;
+    return (2*t3 - 3*t2 + 1)*ys[i] + (t3 - 2*t2 + t)*hh*m[i] + (-2*t3 + 3*t2)*ys[i+1] + (t3 - t2)*hh*m[i+1];
+  };
+}
 
-  return satMult * peakC * Math.pow(Math.max(0, t), p);
+function chromaCurve(L, peakC, peakL, satMult, lKneeL, lKneeC, rKneeL, rKneeC, darkEndL, lightEndL) {
+  if (L <= darkEndL || L >= lightEndL) return 0;
+  const xs = [darkEndL, Math.min(lKneeL, peakL - 0.001), peakL, Math.max(rKneeL, peakL + 0.001), lightEndL];
+  const ys = [0, Math.max(0, lKneeC), peakC, Math.max(0, rKneeC), 0];
+  return satMult * Math.max(0, buildMonotoneCubicSpline(xs, ys)(L));
 }
 
 function midtoneHex(hue, p) {
-  const C = chromaCurve(p.peakL, p.peakChroma, p.peakL, p.sat, p.lowShelf, p.highShelf, p.bandwidth, p.lowCut, p.highCut);
+  const C = chromaCurve(p.peakL, p.peakChroma, p.peakL, p.sat, p.lKneeL, p.lKneeC, p.rKneeL, p.rKneeC, p.darkEnd, p.lightEnd);
   return oklchToHex(p.peakL, C, hue, p.gamut, p.compRatio).hex;
 }
 
@@ -1066,11 +1070,10 @@ function getParams() {
     sat:        +document.getElementById('satSlider').value,
     peakChroma: +document.getElementById('peakChromaSlider').value,
     peakL:      +document.getElementById('peakLSlider').value,
-    lowShelf:   +document.getElementById('lowShelfSlider').value,
-    highShelf:  +document.getElementById('highShelfSlider').value,
-    bandwidth:  +document.getElementById('bandwidthSlider').value,
-    lowCut:     +document.getElementById('lowCutSlider').value,
-    highCut:    +document.getElementById('highCutSlider').value,
+    lKneeL:     +document.getElementById('lKneeLSlider').value,
+    lKneeC:     +document.getElementById('lKneeCSlider').value,
+    rKneeL:     +document.getElementById('rKneeLSlider').value,
+    rKneeC:     +document.getElementById('rKneeCSlider').value,
     lightEnd:   +document.getElementById('lightEndSlider').value,
     darkEnd:    +document.getElementById('darkEndSlider').value,
     steps:      +document.getElementById('stepsSlider').value,
@@ -1128,13 +1131,16 @@ function remapT(t, mode) {
 
 function generateRamp(p, overrideHue) {
   const baseHue = overrideHue !== undefined ? overrideHue : p.hue;
+  const xs = [p.darkEnd, Math.min(p.lKneeL, p.peakL - 0.001), p.peakL, Math.max(p.rKneeL, p.peakL + 0.001), p.lightEnd];
+  const ys = [0, Math.max(0, p.lKneeC), p.peakChroma, Math.max(0, p.rKneeC), 0];
+  const spline = buildMonotoneCubicSpline(xs, ys);
   const swatches = [];
   for (let i = 0; i < p.steps; i++) {
     const tLinear = i / (p.steps - 1);
     const t = remapT(tLinear, p.lSpacing || 'linear');
     const L = p.lightEnd - t * (p.lightEnd - p.darkEnd);
     const hueAtStep = baseHue + p.hueShift * (t - 0.5) * 2;
-    const C = chromaCurve(L, p.peakChroma, p.peakL, p.sat, p.lowShelf, p.highShelf, p.bandwidth, p.lowCut, p.highCut);
+    const C = (L <= xs[0] || L >= xs[4]) ? 0 : p.sat * Math.max(0, spline(L));
     const { hex, clipped } = oklchToHex(L, C, hueAtStep, p.gamut, p.compRatio);
     const stepKey = Math.round(tLinear * 900 + 50);
     swatches.push({ L, C, h: hueAtStep, hex, clipped, step: stepKey, index: i });
@@ -1159,11 +1165,10 @@ function render() {
   syncVal('satVal',        p.sat.toFixed(2));
   syncVal('peakChromaVal', p.peakChroma.toFixed(3));
   syncVal('peakLVal',      p.peakL.toFixed(2));
-  syncVal('lowShelfVal',   p.lowShelf.toFixed(2));
-  syncVal('highShelfVal',  p.highShelf.toFixed(2));
-  syncVal('bandwidthVal',  p.bandwidth.toFixed(2));
-  syncVal('lowCutVal',     p.lowCut.toFixed(3));
-  syncVal('highCutVal',    p.highCut.toFixed(3));
+  syncVal('lKneeLVal',     p.lKneeL.toFixed(2));
+  syncVal('lKneeCVal',     p.lKneeC.toFixed(3));
+  syncVal('rKneeLVal',     p.rKneeL.toFixed(2));
+  syncVal('rKneeCVal',     p.rKneeC.toFixed(3));
   syncVal('lightEndVal',   p.lightEnd.toFixed(3));
   syncVal('darkEndVal',    p.darkEnd.toFixed(3));
   syncVal('stepsVal',      p.steps);
@@ -1245,61 +1250,82 @@ function drawCurve(p) {
   ctx.fillRect(0, 0, W, H);
 
   const maxC = 0.38;
+  const xs = [p.darkEnd, Math.min(p.lKneeL, p.peakL - 0.001), p.peakL, Math.max(p.rKneeL, p.peakL + 0.001), p.lightEnd];
+  const ys = [0, Math.max(0, p.lKneeC), p.peakChroma, Math.max(0, p.rKneeC), 0];
+  const spline = buildMonotoneCubicSpline(xs, ys);
 
-  // Shade cut regions (outside low/high cut = hard zero)
-  const lc = p.lowCut  || 0;
-  const hc = p.highCut !== undefined ? p.highCut : 1;
-  ctx.fillStyle = 'rgba(255,255,255,0.03)';
-  if (lc > 0)  ctx.fillRect(0,      0, lc * W,          H);
-  if (hc < 1)  ctx.fillRect(hc * W, 0, (1 - hc) * W,    H);
-
-  // Shade the bandwidth plateau region
-  if ((p.bandwidth || 0) > 0) {
-    const halfBw = p.bandwidth / 2;
-    const lo = Math.max(0.001, p.peakL - halfBw);
-    const hi = Math.min(0.999, p.peakL + halfBw);
-    ctx.fillStyle = 'rgba(139, 124, 248, 0.08)';
-    ctx.fillRect(lo * W, 0, (hi - lo) * W, H);
+  // Filled area under curve
+  ctx.beginPath();
+  ctx.moveTo(xs[0] * W, H);
+  for (let px = Math.round(xs[0] * W); px <= Math.round(xs[4] * W); px++) {
+    const L = px / W;
+    const C = p.sat * Math.max(0, spline(L));
+    ctx.lineTo(px, H - (C / maxC) * H);
   }
+  ctx.lineTo(xs[4] * W, H);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(139,124,248,0.08)';
+  ctx.fill();
 
-  // Vertical cut markers
-  ctx.lineWidth = 1;
-  ctx.setLineDash([3, 3]);
-  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
-  if (lc > 0) { ctx.beginPath(); ctx.moveTo(lc * W, 0); ctx.lineTo(lc * W, H); ctx.stroke(); }
-  if (hc < 1) { ctx.beginPath(); ctx.moveTo(hc * W, 0); ctx.lineTo(hc * W, H); ctx.stroke(); }
-  ctx.setLineDash([]);
-
+  // Curve stroke
   ctx.beginPath();
   ctx.strokeStyle = '#8b7cf8';
   ctx.lineWidth = 1.5;
-  for (let i = 0; i <= W; i++) {
-    const L = i / W;
-    const C = chromaCurve(L, p.peakChroma, p.peakL, p.sat, p.lowShelf, p.highShelf, p.bandwidth, p.lowCut, p.highCut);
+  for (let px = Math.round(xs[0] * W); px <= Math.round(xs[4] * W); px++) {
+    const L = px / W;
+    const C = p.sat * Math.max(0, spline(L));
     const y = H - (C / maxC) * H;
-    i === 0 ? ctx.moveTo(i, y) : ctx.lineTo(i, y);
+    px === Math.round(xs[0] * W) ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
   }
   ctx.stroke();
 
-  for (let i = 0; i < p.steps; i++) {
-    const t = remapT(i / (p.steps - 1), p.lSpacing || 'linear');
-    const L = p.lightEnd - t * (p.lightEnd - p.darkEnd);
-    const C = chromaCurve(L, p.peakChroma, p.peakL, p.sat, p.lowShelf, p.highShelf, p.bandwidth, p.lowCut, p.highCut);
-    const { hex } = oklchToHex(L, C, p.hue, p.gamut, p.compRatio);
-    const x = L * W, y = H - (C / maxC) * H;
+  // Step dots (diamonds)
+  const swatches = window._swatches || [];
+  swatches.forEach(s => {
+    const x = s.L * W, y = H - (s.C / maxC) * H;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(Math.PI / 4);
     ctx.beginPath();
-    ctx.arc(x, y, 3, 0, Math.PI * 2);
-    ctx.fillStyle = hex;
+    ctx.rect(-3, -3, 6, 6);
+    ctx.fillStyle = s.hex;
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
     ctx.lineWidth = 0.5;
     ctx.stroke();
-  }
+    ctx.restore();
+  });
+
+  // 5 control-point circles with labels
+  ctx.font = `9px 'IBM Plex Mono', monospace`;
+  const knots = [
+    { L: xs[0], C: ys[0], label: 'Dark'   },
+    { L: xs[1], C: ys[1], label: 'L-Knee' },
+    { L: xs[2], C: ys[2], label: 'Peak'   },
+    { L: xs[3], C: ys[3], label: 'R-Knee' },
+    { L: xs[4], C: ys[4], label: 'Light'  },
+  ];
+  knots.forEach(({ L, C, label }) => {
+    const x = L * W, y = H - (C / maxC) * H;
+    ctx.beginPath();
+    ctx.arc(x, y, 5, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#8b7cf8';
+    ctx.fill();
+    const tw = ctx.measureText(label).width;
+    const labelY = y - 10 > 10 ? y - 10 : y + 16;
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.fillText(label, x - tw / 2, labelY);
+  });
 
   ctx.fillStyle = '#5a5a88';
   ctx.font = `9px 'IBM Plex Mono', monospace`;
-  ctx.fillText('L →', 4, H - 4);
   ctx.fillText('C ↑', 4, 10);
+  ctx.fillText('0.10 →', 4, H - 4);
 }
 
 /* ════════════════════════════════════
@@ -1554,11 +1580,10 @@ document.getElementById('sysCountSlider').addEventListener('input', syncSystemHu
   ['satVal',        'satSlider'],
   ['peakChromaVal', 'peakChromaSlider'],
   ['peakLVal',      'peakLSlider'],
-  ['lowShelfVal',   'lowShelfSlider'],
-  ['highShelfVal',  'highShelfSlider'],
-  ['bandwidthVal',  'bandwidthSlider'],
-  ['lowCutVal',     'lowCutSlider'],
-  ['highCutVal',    'highCutSlider'],
+  ['lKneeLVal',     'lKneeLSlider'],
+  ['lKneeCVal',     'lKneeCSlider'],
+  ['rKneeLVal',     'rKneeLSlider'],
+  ['rKneeCVal',     'rKneeCSlider'],
   ['lightEndVal',   'lightEndSlider'],
   ['darkEndVal',    'darkEndSlider'],
   ['stepsVal',      'stepsSlider'],

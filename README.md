@@ -48,13 +48,12 @@ The hero swatch row and hex strip at the top render **dark to light, left to rig
 | **Saturation** | A multiplier applied to the entire chroma curve. 1.0 = curve as-is; values below 1 produce more neutral/muted ramps; values above 1 push toward maximum chroma. |
 | **Chroma Peak** | The maximum chroma value reached at the apex of the curve. Higher values produce more vivid mid-tones. |
 | **Peak at L** | The lightness value at which chroma peaks. 0.55 biases the most vivid color slightly above mid-gray, which tends to feel natural. Shift toward 0.3–0.4 for ramps that pop in dark UI; toward 0.6–0.7 for light UI. |
-| **Low shelf** | Steepens the curve's rolloff near the dark end — the chroma-vs-luminance curve "angles more sharply toward zero" near black. At 0 the rolloff uses the default √t shoulder. At 1 the chroma stays near peak through the dark midtones and drops abruptly only right at the cut point, like a low-shelf EQ filter cutting steeply below the shelf frequency. |
-| **High shelf** | Same as Low shelf, applied to the light end of the curve. Steepens the rolloff toward white. |
-| **Bandwidth** | Widens the chroma peak into a flat plateau centered on Peak at L. Analogous to a low Q (wide bandwidth) peak in audio EQ: rather than chroma cresting at a single luminance value and immediately declining, it stays at maximum across a range of steps on either side of the peak. At 0 the peak is a single point; at 0.5 the plateau spans half the full L range. |
-| **Low cut** | Sets the luminance value at which chroma drops to absolute zero on the dark side (default 0 = pure black). Raising this rolls off chroma entirely below the threshold, like a high-pass filter silencing low frequencies — useful for keeping the darkest steps in your ramp truly neutral regardless of saturation or shelf settings. |
-| **High cut** | Sets the luminance value at which chroma drops to absolute zero on the light side (default 1 = pure white). Lowering this rolls off chroma entirely above the threshold, keeping the lightest steps neutral. |
+| **L-Knee L** | Lightness position of the left knee — the intermediate control point between the dark anchor and the peak. Moving it closer to the dark end steepens the initial rise; moving it closer to the peak produces a more gradual ramp up. |
+| **L-Knee C** | Chroma at the left knee. Higher values pull the curve upward on the dark side, creating a fuller shoulder; lower values keep it lean near the dark anchor. |
+| **R-Knee L** | Lightness position of the right knee — the intermediate control point between the peak and the light anchor. Moving it closer to the peak steepens the descent; moving it toward the light end produces a long, gradual tail. |
+| **R-Knee C** | Chroma at the right knee. Controls the fullness of the curve's light-side shoulder, mirroring the role of L-Knee C on the dark side. |
 
-The **curve canvas** below these controls visualizes the actual chroma-vs-lightness shape, dark on the left and light on the right, with each ramp step plotted as a colored dot. Cut boundaries are marked with dashed vertical lines; the bandwidth plateau is shaded.
+The **curve canvas** below these controls visualizes the 5-point chroma-vs-lightness shape, dark on the left and light on the right. The five control points — **Dark**, **L-Knee**, **Peak**, **R-Knee**, and **Light** — are drawn as labelled circles. Each ramp step is plotted as a colored diamond.
 
 ### Lightness Range & Steps
 
@@ -171,47 +170,29 @@ Newline-separated hex values, darkest to lightest. Paste directly into Figma's "
 
 ## The Chroma Curve
 
-Rather than requiring manual chroma entry per stop, the studio uses a parametric chroma curve — an **audio-compressor-inspired shape** applied to the luminance axis.
-
-The underlying metaphor: if you think of the lightness axis as frequency and the chroma value at each step as gain, the chroma curve is an EQ. The tent-shaped default curve is the signal. The shelf, bandwidth, and cut controls are the equalizer bands.
-
-### Default shape
-
-Chroma rises from zero at the dark cut point to a peak at `peakL`, then falls back to zero at the light cut point. This mirrors how pigment and natural color behaves and ensures dark and light extremes remain neutral regardless of saturation.
+Rather than requiring manual chroma entry per stop, the studio uses a **5-point monotone cubic spline** to describe the chroma-vs-lightness shape. The curve is anchored to zero chroma at both ends of the ramp and passes exactly through five control points:
 
 ```
-t = (L − lowCut) / (peakL − lowCut)      if L ≤ peakL
-t = (highCut − L) / (highCut − peakL)    if L > peakL
-
-C(L) = saturation × peakChroma × t^p
+(darkEnd_L, 0)   →   (lKneeL, lKneeC)   →   (peakL, peakC)   →   (rKneeL, rKneeC)   →   (lightEnd_L, 0)
 ```
 
-The exponent `p` defaults to 0.5 (square root), applying a shoulder that prevents an abrupt jump from the dark end.
+This directly models design intent: you choose where chroma rises, where it peaks, and how it falls — rather than dialing abstract EQ parameters.
 
-### Shelf controls (Low shelf / High shelf)
+### Interpolation
 
-In audio, a shelf filter boosts or cuts all frequencies below (low-shelf) or above (high-shelf) a given point. Here, the shelf controls change the **steepness of the chroma rolloff** near the dark and light endpoints.
+The curve is computed using the **Fritsch-Carlson monotone cubic Hermite spline** algorithm. Monotone interpolation guarantees the spline never overshoots between two adjacent control points, which means chroma cannot go negative or exceed the peak — even when the knee points are set asymmetrically.
 
-At 0 — the default — the rolloff uses the `√t` shoulder. Increasing the shelf amount lowers the curve exponent toward `t^0.05`, producing a shape that holds near peak chroma through most of the ramp and drops steeply only right at the cut boundary. Think of it as compressing the "silence zone" to the very edge of the range — or visually, squaring off the sides of the tent.
+### Control points
 
-Low shelf governs the dark side (L < peakL). High shelf governs the light side (L > peakL). They can be set independently.
+| Point | Controls |
+|---|---|
+| **Dark anchor** | Fixed at `(darkEnd_L, 0)` — always zero chroma at the darkest stop. |
+| **L-Knee** | `(L-Knee L, L-Knee C)` — shapes how quickly chroma rises from the dark anchor toward the peak. A low L position steepens the initial rise; a high C value broadens the dark shoulder. |
+| **Peak** | `(Peak at L, Chroma Peak)` — the chroma apex, scaled by Saturation. |
+| **R-Knee** | `(R-Knee L, R-Knee C)` — shapes the descent from peak toward the light anchor. Mirrors the role of the left knee on the light side. |
+| **Light anchor** | Fixed at `(lightEnd_L, 0)` — always zero chroma at the lightest stop. |
 
-### Bandwidth (Q)
-
-In audio EQ, the Q factor controls how wide or narrow a peak is around the center frequency. Low Q = broad, rounded peak. High Q = sharp, narrow spike.
-
-The **Bandwidth** control is the low-Q analog: it extends the chroma peak from a single point into a flat plateau centered on `peakL`. Steps that fall within the plateau get the full peak chroma; the rolloff (shaped by the shelf controls) only begins at the plateau edges.
-
-At 0, Peak at L is a single point. At 0.3, the plateau spans 0.3 luminance units — about three full steps in an 11-step ramp. The curve canvas shades the plateau region.
-
-### Cut controls (Low cut / High cut)
-
-In audio, a high-pass filter silences everything below a cutoff frequency; a low-pass filter silences everything above. The **Low cut** and **High cut** controls do exactly this for chroma:
-
-- **Low cut** — sets the luminance below which chroma is hard zero. Default 0 (pure black). Raising it clamps the darkest stops to neutral, regardless of shelf or saturation settings.
-- **High cut** — sets the luminance above which chroma is hard zero. Default 1 (pure white). Lowering it clamps the lightest stops to neutral.
-
-Cuts also shift the rolloff reference points: instead of the shelf curve stretching from L=0 to peakL, it stretches from `lowCut` to the plateau edge — so the shelf effect remains proportional as you move the cut.
+The ordering constraint `darkEnd < L-Knee L < Peak at L < R-Knee L < lightEnd` is enforced at render time, so the curve always has a valid shape regardless of slider positions.
 
 ---
 
