@@ -116,11 +116,12 @@ Controls which perceptual color model is used to convert the ramp's L, C, h valu
 | Mode | Behavior |
 |---|---|
 | **OKLCH** | Default. Uses the OKLab color model developed by Björn Ottosson (2020). Gamut mapping, the chroma ceiling overlay, and all ramp calculations run in OKLCH space. |
+| **SRLCH** | Uses SRLAB2 cylindrical coordinates (srL\*C\*h°). Jan Behrens (2011). L, C, h parameter values are scaled to SRLAB2 natural units — L × 100, C × 300 — before conversion. Retains CIELAB's nonlinearity and 0–100 L\* scale while reducing hue non-uniformities through a re-optimized pre-nonlinearity matrix. |
 | **CIELCH** | Uses CIELAB cylindrical coordinates (CIE L\*C\*h°). The same L, C, h parameter values are scaled to CIELCH natural units — L × 100, C × 300 — before conversion. |
 
-When CIELCH is active, the gamut ceiling overlay on the curve canvas updates to reflect CIELCH's sRGB boundary for the active hue, so the dashed line remains accurate to the active color space.
+When CIELCH or SRLCH is active, the gamut ceiling overlay on the curve canvas updates to reflect that space's sRGB boundary for the active hue, so the dashed line remains accurate to the active color space.
 
-See [OKLCH vs CIELCH](#oklch-vs-cielch) for guidance on when to use each.
+See [OKLCH vs CIELCH vs SRLCH](#oklch-vs-cielch-vs-srlch) for guidance on when to use each.
 
 ### L Spacing
 
@@ -268,7 +269,7 @@ The canvas draws a **dashed white line** showing the maximum in-gamut sRGB chrom
 
 ---
 
-## OKLCH vs CIELCH
+## OKLCH vs CIELCH vs SRLCH
 
 ### A brief history
 
@@ -299,6 +300,14 @@ The result:
 
 OKLab was adopted into the CSS Color Level 4 specification as `oklch()` / `oklab()` in 2022 and is now natively supported by all major browsers.
 
+### Why SRLAB2 was created
+
+In 2011, Jan Behrens published [SRLAB2](https://www.magnetkern.de/srlab2.html) as an intermediate position between CIELAB and the more recent perceptual models. Where CIELAB applies its cube-root nonlinearity to XYZ values scaled by the D65 reference white directly, SRLAB2 first passes those XYZ values through a re-optimized chromatic adaptation transform (based on CAT02 cone responses with Hunt-Pointer-Estevez primaries for the inverse). The resulting pre-nonlinearity values are a better substrate for the cube-root step, reducing the same blue–purple hue skew and chroma–lightness coupling that Ottosson later addressed in OKLab.
+
+SRLAB2 retains the identical nonlinearity form as CIELAB and produces L\* values in the same 0–100 range with chroma in comparable units — making it a direct successor to CIELAB that is more perceptually uniform without departing entirely from the CIELAB framework the way OKLab does.
+
+OKLab goes further — its linear transforms were fit empirically to perceptual difference data — and generally outperforms SRLAB2 on hue uniformity benchmarks. But SRLAB2 is a useful intermediate reference, especially when transitioning from a CIELAB workflow or cross-referencing against SRLAB2-based tools.
+
 ### When to use each
 
 **Use OKLCH (default) when:**
@@ -314,7 +323,13 @@ OKLab was adopted into the CSS Color Level 4 specification as `oklch()` / `oklab
 - You want to see the historical CIELAB rendering of a ramp for comparison or academic purposes.
 - Your target rendering pipeline internally uses CIELAB (some older design tools, colorimetric measurements, textile industry workflows).
 
-For most web and product design work, the differences between OKLCH and CIELCH are subtle in the midtones but clearly visible at high chroma, particularly for blues and warm yellows. Toggling between the two is the fastest way to see whether the non-uniformities in CIELAB are materially affecting your ramp.
+**Use SRLCH when:**
+
+- You want CIELAB's familiar L\*C\*h° framework and 0–100 L\* scale with reduced hue skew.
+- Comparing against SRLAB2-based tools or validating an SRLAB2 implementation.
+- Academic or research contexts where SRLAB2 is the reference standard.
+
+For most web and product design work, the differences between OKLCH and CIELCH are subtle in the midtones but clearly visible at high chroma, particularly for blues and warm yellows. SRLCH produces ramps noticeably better than CIELCH and comparable to OKLCH, with the most visible improvement in the blue and violet hue range. For production UI work, OKLCH remains the recommended default.
 
 ---
 

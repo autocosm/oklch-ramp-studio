@@ -859,10 +859,11 @@
     <div class="toggle-row" style="margin-top:10px;">
       <div>
         <span class="toggle-label">Color space</span>
-        <span class="toggle-desc">OkLCH = Björn Ottosson's perceptual model · CIELCH = CIE L*C*h° (CIELAB cylindrical)</span>
+        <span class="toggle-desc">OkLCH = Björn Ottosson's perceptual model · SRLCH = SRLAB2 (Behrens 2011) · CIELCH = CIE L*C*h° (CIELAB cylindrical)</span>
       </div>
       <div class="toggle-btn">
         <div class="toggle-opt active" id="opt-cs-oklch"  onclick="setColorSpace('oklch')">OKLCH</div>
+        <div class="toggle-opt"        id="opt-cs-srlch"  onclick="setColorSpace('srlch')">SRLCH</div>
         <div class="toggle-opt"        id="opt-cs-cielch" onclick="setColorSpace('cielch')">CIELCH</div>
       </div>
     </div>
@@ -994,13 +995,37 @@ function cielchToLinearRGB(L, C, h) {
   ];
 }
 
-// Scales to convert UI-space (OKLCH-normalised) L and C to CIELCH natural units.
-// OKLCH L [0,1] ↔ CIELCH L* [0,100];  OKLCH C [0,~0.4] ↔ CIELCH C* [0,~120].
+// Scales to convert UI-space (OKLCH-normalised) L and C to CIELCH / SRLCH natural units.
+// OKLCH L [0,1] ↔ CIELCH/SRLAB2 L* [0,100];  OKLCH C [0,~0.4] ↔ C* [0,~120].
 const CIELCH_L_SCALE = 100;
 const CIELCH_C_SCALE = 300;
+const SRLCH_L_SCALE  = 100;
+const SRLCH_C_SCALE  = 300;
+
+// SRLAB2 (Jan Behrens 2011) cylindrical srL*C*h° → linear sRGB.
+// L in [0, 100], C in [0, ~150], h in degrees.
+function srlchToLinearRGB(L, C, h) {
+  const hr = h * Math.PI / 180;
+  const a  = C * Math.cos(hr);
+  const b  = C * Math.sin(hr);
+  // Inverse Behrens Lab matrix: L*a*b* → intermediate XYZ'
+  let x = 0.01 * L + 0.000904127 * a + 0.000456344 * b;
+  let y = 0.01 * L - 0.000533159 * a - 0.000269178 * b;
+  let z = 0.01 * L                   - 0.005800000 * b;
+  // Inverse nonlinearity (threshold 0.08 corresponds to forward threshold 216/24389)
+  const invF = t => t <= 0.08 ? t * (2700 / 24389) : Math.pow((t + 0.16) / 1.16, 3);
+  x = invF(x); y = invF(y); z = invF(z);
+  // Inverse Behrens forward matrix: intermediate XYZ → linear sRGB
+  return [
+    +5.435679 * x - 4.599131 * y + 0.163593 * z,
+    -1.168090 * x + 2.327977 * y - 0.159798 * z,
+    +0.037840 * x - 0.198564 * y + 1.160644 * z
+  ];
+}
 
 function uiToLinearRGB(L, C, h, colorSpace) {
   if (colorSpace === 'cielch') return cielchToLinearRGB(L * CIELCH_L_SCALE, C * CIELCH_C_SCALE, h);
+  if (colorSpace === 'srlch')  return srlchToLinearRGB(L * SRLCH_L_SCALE,  C * SRLCH_C_SCALE,  h);
   return oklchToLinearRGB(L, C, h);
 }
 
@@ -1830,6 +1855,7 @@ function setColorSpace(mode) {
   state.colorSpace = mode;
   document.getElementById('opt-cs-oklch').classList.toggle('active',  mode === 'oklch');
   document.getElementById('opt-cs-cielch').classList.toggle('active', mode === 'cielch');
+  document.getElementById('opt-cs-srlch').classList.toggle('active',  mode === 'srlch');
   render();
 }
 

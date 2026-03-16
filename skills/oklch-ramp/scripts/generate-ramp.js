@@ -24,6 +24,50 @@ function oklchToLinearRGB(L, C, h) {
   ];
 }
 
+function cielchToLinearRGB(L, C, h) {
+  const hr = h * Math.PI / 180;
+  const a = C * Math.cos(hr);
+  const b = C * Math.sin(hr);
+  const fy = (L + 16) / 116;
+  const fx = a / 500 + fy;
+  const fz = fy - b / 200;
+  const t0 = 6 / 29;
+  const labF = t => t > t0 ? t * t * t : 3 * t0 * t0 * (t - 4 / 29);
+  const X = 0.95047 * labF(fx);
+  const Y = 1.00000 * labF(fy);
+  const Z = 1.08883 * labF(fz);
+  return [
+    +3.2404542 * X - 1.5371385 * Y - 0.4985314 * Z,
+    -0.9692660 * X + 1.8760108 * Y + 0.0415560 * Z,
+    +0.0556434 * X - 0.2040259 * Y + 1.0572252 * Z
+  ];
+}
+
+function srlchToLinearRGB(L, C, h) {
+  const hr = h * Math.PI / 180;
+  const a  = C * Math.cos(hr);
+  const b  = C * Math.sin(hr);
+  let x = 0.01 * L + 0.000904127 * a + 0.000456344 * b;
+  let y = 0.01 * L - 0.000533159 * a - 0.000269178 * b;
+  let z = 0.01 * L                   - 0.005800000 * b;
+  const invF = t => t <= 0.08 ? t * (2700 / 24389) : Math.pow((t + 0.16) / 1.16, 3);
+  x = invF(x); y = invF(y); z = invF(z);
+  return [
+    +5.435679 * x - 4.599131 * y + 0.163593 * z,
+    -1.168090 * x + 2.327977 * y - 0.159798 * z,
+    +0.037840 * x - 0.198564 * y + 1.160644 * z
+  ];
+}
+
+const CIELCH_L_SCALE = 100, CIELCH_C_SCALE = 300;
+const SRLCH_L_SCALE  = 100, SRLCH_C_SCALE  = 300;
+
+function uiToLinearRGB(L, C, h, colorSpace) {
+  if (colorSpace === 'cielch') return cielchToLinearRGB(L * CIELCH_L_SCALE, C * CIELCH_C_SCALE, h);
+  if (colorSpace === 'srlch')  return srlchToLinearRGB(L * SRLCH_L_SCALE,  C * SRLCH_C_SCALE,  h);
+  return oklchToLinearRGB(L, C, h);
+}
+
 function linearToSRGB(c) {
   return c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
 }
@@ -34,53 +78,53 @@ function isInGamut(r, g, b, eps = 0.001) {
   return r >= -eps && r <= 1 + eps && g >= -eps && g <= 1 + eps && b >= -eps && b <= 1 + eps;
 }
 
-function smartGamutMap(L, C, h) {
-  let [r, g, b] = oklchToLinearRGB(L, C, h);
+function smartGamutMap(L, C, h, colorSpace) {
+  let [r, g, b] = uiToLinearRGB(L, C, h, colorSpace);
   if (isInGamut(r, g, b)) return { r, g, b, clipped: false };
   let lo = 0, hi = C, mid;
   for (let i = 0; i < 24; i++) {
     mid = (lo + hi) / 2;
-    [r, g, b] = oklchToLinearRGB(L, mid, h);
+    [r, g, b] = uiToLinearRGB(L, mid, h, colorSpace);
     isInGamut(r, g, b) ? (lo = mid) : (hi = mid);
   }
-  [r, g, b] = oklchToLinearRGB(L, lo, h);
+  [r, g, b] = uiToLinearRGB(L, lo, h, colorSpace);
   return { r, g, b, clipped: true };
 }
 
-function findMaxChroma(L, h) {
+function findMaxChroma(L, h, colorSpace) {
   let lo = 0, hi = 0.5;
-  let [r, g, b] = oklchToLinearRGB(L, hi, h);
+  let [r, g, b] = uiToLinearRGB(L, hi, h, colorSpace);
   if (isInGamut(r, g, b)) {
-    while (isInGamut(...oklchToLinearRGB(L, hi, h)) && hi < 1) hi *= 2;
+    while (isInGamut(...uiToLinearRGB(L, hi, h, colorSpace)) && hi < 1) hi *= 2;
   }
   let mid;
   for (let i = 0; i < 28; i++) {
     mid = (lo + hi) / 2;
-    [r, g, b] = oklchToLinearRGB(L, mid, h);
+    [r, g, b] = uiToLinearRGB(L, mid, h, colorSpace);
     isInGamut(r, g, b) ? (lo = mid) : (hi = mid);
   }
   return lo;
 }
 
-function compressGamutMap(L, C, h, ratio) {
-  const maxC = findMaxChroma(L, h);
+function compressGamutMap(L, C, h, ratio, colorSpace) {
+  const maxC = findMaxChroma(L, h, colorSpace);
   if (C <= maxC) {
-    const [r, g, b] = oklchToLinearRGB(L, C, h);
+    const [r, g, b] = uiToLinearRGB(L, C, h, colorSpace);
     return { r, g, b, clipped: false };
   }
   const compressedC = maxC + (C - maxC) / ratio;
-  const [r, g, b] = oklchToLinearRGB(L, compressedC, h);
+  const [r, g, b] = uiToLinearRGB(L, compressedC, h, colorSpace);
   return { r, g, b, clipped: true };
 }
 
-function oklchToHex(L, C, h, mode, ratio = 4) {
+function colorToHex(L, C, h, mode, ratio = 4, colorSpace = 'oklch') {
   let r, g, b, clipped = false;
   if (mode === 'smart') {
-    ({ r, g, b, clipped } = smartGamutMap(L, C, h));
+    ({ r, g, b, clipped } = smartGamutMap(L, C, h, colorSpace));
   } else if (mode === 'compress') {
-    ({ r, g, b, clipped } = compressGamutMap(L, C, h, ratio));
+    ({ r, g, b, clipped } = compressGamutMap(L, C, h, ratio, colorSpace));
   } else {
-    [r, g, b] = oklchToLinearRGB(L, C, h);
+    [r, g, b] = uiToLinearRGB(L, C, h, colorSpace);
     if (!isInGamut(r, g, b)) clipped = true;
   }
   r = linearToSRGB(clamp01(r));
@@ -114,7 +158,7 @@ function generateRamp(p) {
     const L = p.lightEnd - t * (p.lightEnd - p.darkEnd);
     const hueAtStep = p.hue + p.hueShift * (t - 0.5) * 2;
     const C = chromaCurve(L, p.peakChroma, p.peakL, p.sat);
-    const { hex, clipped } = oklchToHex(L, C, hueAtStep, p.gamut, p.compRatio);
+    const { hex, clipped } = colorToHex(L, C, hueAtStep, p.gamut, p.compRatio, p.colorSpace);
     const stepKey = Math.round(tLinear * 900 + 50);
     swatches.push({ L, C, h: hueAtStep, hex, clipped, step: stepKey, index: i });
   }
@@ -184,6 +228,7 @@ function parseArgs(argv) {
     gamut:      get('--gamut', 'smart'),       // smart | naive | compress
     compRatio:  parseFloat(get('--compRatio', '4')),
     lSpacing:   get('--spacing', 'linear'),    // linear | parabolic | adjusted
+    colorSpace: get('--colorSpace', 'oklch'), // oklch | cielch | srlch
     format:     get('--format', 'css'),        // css | json | scss | tailwind | hex
     name:       get('--name', 'color'),
   };
