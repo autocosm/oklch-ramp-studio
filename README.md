@@ -32,6 +32,20 @@ Click any swatch or hex chip to copy that value to the clipboard. Use the Export
 
 A **DARK / LIGHT** toggle in the header switches the entire page chrome — all backgrounds, borders, text, and UI surfaces — between a near-black dark theme and an off-white light theme via CSS custom property overrides. This lets you evaluate ramp swatches against the same kind of surface they'll actually appear on in your product.
 
+### WCAG Contrast Check
+
+A **WCAG OFF / WCAG ON** toggle in the header enables accessibility contrast checking on the swatch row. When on, each swatch displays a centered badge showing its WCAG rating and the exact contrast ratio (e.g. `AA` / `8.2:1`). The badge text color — black or white — is chosen by whichever achieves the higher contrast ratio against that swatch, using the WCAG relative luminance formula. This also governs the color of the hex value label on each swatch while the check is active.
+
+Ratings follow WCAG 2.1 thresholds for normal text:
+
+| Badge | Contrast ratio | Meaning |
+|---|---|---|
+| **AAA** | ≥ 7:1 | Enhanced — passes all text sizes |
+| **AA** | ≥ 4.5:1 | Minimum — passes normal text |
+| **—** | < 4.5:1 | Fail — text on this stop requires care |
+
+The contrast ratio line is hidden at narrow viewport widths to avoid overlap with the hex label.
+
 ### Ramp Display
 
 The hero swatch row at the top renders **dark to light, left to right** — matching the X axis of the curve canvas below, where L = 0 (black) is on the left and L = 1 (white) is on the right. Each swatch displays its hex value persistently, oriented vertically. Click or tap any swatch to copy its hex value to the clipboard.
