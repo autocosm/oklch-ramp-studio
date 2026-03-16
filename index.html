@@ -832,12 +832,13 @@
     <div class="toggle-row" style="margin-top:10px;">
       <div>
         <span class="toggle-label">L spacing</span>
-        <span class="toggle-desc">Linear = equal steps · Parabolic = denser near extremes · Adjusted = perceptually equal</span>
+        <span class="toggle-desc">Linear = equal L steps · Para = denser near extremes · Adj = perceptually equal · Arc = equal LC curve distance</span>
       </div>
       <div class="toggle-btn">
         <div class="toggle-opt active" id="opt-lsp-linear"   onclick="setLSpacing('linear')">LINEAR</div>
         <div class="toggle-opt"        id="opt-lsp-para"     onclick="setLSpacing('parabolic')">PARA</div>
         <div class="toggle-opt"        id="opt-lsp-adjusted" onclick="setLSpacing('adjusted')">ADJ</div>
+        <div class="toggle-opt"        id="opt-lsp-arc"      onclick="setLSpacing('arc')">ARC</div>
       </div>
     </div>
 
@@ -1117,6 +1118,7 @@ function setLSpacing(mode) {
   document.getElementById('opt-lsp-linear').classList.toggle('active', mode === 'linear');
   document.getElementById('opt-lsp-para').classList.toggle('active', mode === 'parabolic');
   document.getElementById('opt-lsp-adjusted').classList.toggle('active', mode === 'adjusted');
+  document.getElementById('opt-lsp-arc').classList.toggle('active', mode === 'arc');
   render();
 }
 
@@ -1126,12 +1128,11 @@ function remapT(t, mode) {
   if (mode === 'linear') return t;
 
   if (mode === 'parabolic') {
-    // Quadratic that concentrates steps near 0 and 1, spreads midtones.
-    // Uses a blend: more weight to extremes via 3t²-2t³ (smoothstep) inverted.
-    // We want the *opposite* of smoothstep: more samples at extremes.
-    // f(t) = 0.5 - 0.5*cos(π*t)  is a smooth "ease in/out" which does this:
-    // it moves slowly near 0 and 1 (dense samples) and fast in the middle.
-    return 0.5 - 0.5 * Math.cos(Math.PI * t);
+    // Cosine ease-in/out concentrates steps near 0 and 1 (dense at extremes,
+    // wider in midtones). Blended 75% cosine / 25% linear so the intervals
+    // between the extreme steps are slightly larger and less cramped.
+    const cosine = 0.5 - 0.5 * Math.cos(Math.PI * t);
+    return 0.75 * cosine + 0.25 * t;
   }
 
   if (mode === 'adjusted') {
@@ -1146,6 +1147,7 @@ function remapT(t, mode) {
     return Math.pow(t, 0.77);
   }
 
+  // 'arc' mode is handled in generateRamp (needs spline access); fall through.
   return t;
 }
 
@@ -1160,10 +1162,41 @@ function generateRamp(p, overrideHue) {
   const xs = [p.curveDark, Math.min(effL, p.peakL - 0.001), p.peakL, Math.max(effR, p.peakL + 0.001), p.curveLight];
   const ys = [0, Math.max(0, p.lKneeC), p.peakChroma, Math.max(0, p.rKneeC), 0];
   const spline = buildMonotoneCubicSpline(xs, ys);
+
+  // Arc-length spacing: divide the LC curve into equal-distance intervals,
+  // where distance is Euclidean in (L, C) space (both dimensions count).
+  let arcRemap = null;
+  if ((p.lSpacing || 'linear') === 'arc') {
+    const N = 500;
+    const cumArc = new Float64Array(N + 1);
+    let prevL = p.rampLight;
+    let prevC = (prevL <= xs[0] || prevL >= xs[4]) ? 0 : p.sat * Math.max(0, spline(prevL));
+    cumArc[0] = 0;
+    for (let k = 1; k <= N; k++) {
+      const tk = k / N;
+      const L = p.rampLight - tk * (p.rampLight - p.rampDark);
+      const C = (L <= xs[0] || L >= xs[4]) ? 0 : p.sat * Math.max(0, spline(L));
+      const dL = L - prevL, dC = C - prevC;
+      cumArc[k] = cumArc[k - 1] + Math.sqrt(dL * dL + dC * dC);
+      prevL = L; prevC = C;
+    }
+    const totalArc = cumArc[N];
+    arcRemap = tLinear => {
+      const target = tLinear * totalArc;
+      let lo = 0, hi = N;
+      while (hi - lo > 1) {
+        const mid = (lo + hi) >> 1;
+        if (cumArc[mid] <= target) lo = mid; else hi = mid;
+      }
+      const frac = (cumArc[hi] > cumArc[lo]) ? (target - cumArc[lo]) / (cumArc[hi] - cumArc[lo]) : 0;
+      return (lo + frac) / N;
+    };
+  }
+
   const swatches = [];
   for (let i = 0; i < p.steps; i++) {
     const tLinear = i / (p.steps - 1);
-    const t = remapT(tLinear, p.lSpacing || 'linear');
+    const t = arcRemap ? arcRemap(tLinear) : remapT(tLinear, p.lSpacing || 'linear');
     const L = p.rampLight - t * (p.rampLight - p.rampDark);
     const hueAtStep = baseHue + p.hueShift * (t - 0.5) * 2;
     const C = (L <= xs[0] || L >= xs[4]) ? 0 : p.sat * Math.max(0, spline(L));
@@ -1253,16 +1286,25 @@ function render() {
    CURVE CANVAS
    ════════════════════════════════════ */
 
+// Cache for the expensive curve background (fill + stroke + gamut ceiling).
+// Keyed by curve/hue params; lSpacing and steps are intentionally excluded
+// because they only affect the foreground step diamonds.
+const _curveCache = { key: null, canvas: null };
+
 function drawCurve(p) {
   const canvas = document.getElementById('curve-canvas');
   const ctx = canvas.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
   const W = canvas.offsetWidth, H = canvas.offsetHeight;
-  canvas.width = W * dpr; canvas.height = H * dpr;
-  ctx.scale(dpr, dpr);
+  const needW = Math.round(W * dpr), needH = Math.round(H * dpr);
 
-  ctx.fillStyle = '#07070f';
-  ctx.fillRect(0, 0, W, H);
+  // Only resize (and clear) when dimensions actually change.
+  if (canvas.width !== needW || canvas.height !== needH) {
+    canvas.width = needW;
+    canvas.height = needH;
+    _curveCache.key = null; // invalidate on resize
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   const maxC = 0.38;
   const effL = Math.max(p.curveDark + 0.01, p.peakL - (p.peakL - p.lKneeL) / p.peakQ);
@@ -1271,51 +1313,71 @@ function drawCurve(p) {
   const ys = [0, Math.max(0, p.lKneeC), p.peakChroma, Math.max(0, p.rKneeC), 0];
   const spline = buildMonotoneCubicSpline(xs, ys);
 
-  // Filled area under curve
-  ctx.beginPath();
-  ctx.moveTo(xs[0] * W, H);
-  for (let px = Math.round(xs[0] * W); px <= Math.round(xs[4] * W); px++) {
-    const L = px / W;
-    const C = p.sat * Math.max(0, spline(L));
-    ctx.lineTo(px, H - (C / maxC) * H);
-  }
-  ctx.lineTo(xs[4] * W, H);
-  ctx.closePath();
-  ctx.fillStyle = 'rgba(139,124,248,0.08)';
-  ctx.fill();
+  // Background cache key — excludes lSpacing, steps, and interaction state.
+  const bgKey = `${needW}x${needH}|${p.hue}|${p.hueShift}|${p.rampLight}|${p.rampDark}|${p.peakL}|${p.peakChroma}|${p.sat}|${p.lKneeL}|${p.lKneeC}|${p.rKneeL}|${p.rKneeC}|${p.curveDark}|${p.curveLight}|${p.peakQ}`;
 
-  // Curve stroke
-  ctx.beginPath();
-  ctx.strokeStyle = '#8b7cf8';
-  ctx.lineWidth = 1.5;
-  for (let px = Math.round(xs[0] * W); px <= Math.round(xs[4] * W); px++) {
-    const L = px / W;
-    const C = p.sat * Math.max(0, spline(L));
-    const y = H - (C / maxC) * H;
-    px === Math.round(xs[0] * W) ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
-  }
-  ctx.stroke();
+  if (_curveCache.key !== bgKey) {
+    // Redraw the expensive background to an offscreen canvas.
+    const bg = document.createElement('canvas');
+    bg.width = needW; bg.height = needH;
+    const bc = bg.getContext('2d');
+    bc.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  // Gamut ceiling — dashed curve showing max in-gamut chroma for current hue
-  ctx.save();
-  ctx.strokeStyle = 'rgba(255,255,255,0.22)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([4, 4]);
-  ctx.beginPath();
-  let ceilStarted = false;
-  const rampSpan = p.rampLight - p.rampDark;
-  for (let px = 0; px <= W; px += 4) {
-    const L = px / W;
-    const t = rampSpan > 0 ? (p.rampLight - L) / rampSpan : 0.5;
-    const hueAtL = p.hue + p.hueShift * (t - 0.5) * 2;
-    const ceiling = Math.min(findMaxChroma(L, hueAtL), maxC);
-    const y = H - (ceiling / maxC) * H;
-    if (!ceilStarted) { ctx.moveTo(px, y); ceilStarted = true; }
-    else { ctx.lineTo(px, y); }
+    bc.fillStyle = '#07070f';
+    bc.fillRect(0, 0, W, H);
+
+    // Filled area under curve
+    bc.beginPath();
+    bc.moveTo(xs[0] * W, H);
+    for (let px = Math.round(xs[0] * W); px <= Math.round(xs[4] * W); px++) {
+      const L = px / W;
+      const C = p.sat * Math.max(0, spline(L));
+      bc.lineTo(px, H - (C / maxC) * H);
+    }
+    bc.lineTo(xs[4] * W, H);
+    bc.closePath();
+    bc.fillStyle = 'rgba(139,124,248,0.08)';
+    bc.fill();
+
+    // Curve stroke
+    bc.beginPath();
+    bc.strokeStyle = '#8b7cf8';
+    bc.lineWidth = 1.5;
+    for (let px = Math.round(xs[0] * W); px <= Math.round(xs[4] * W); px++) {
+      const L = px / W;
+      const C = p.sat * Math.max(0, spline(L));
+      const y = H - (C / maxC) * H;
+      px === Math.round(xs[0] * W) ? bc.moveTo(px, y) : bc.lineTo(px, y);
+    }
+    bc.stroke();
+
+    // Gamut ceiling — dashed curve showing max in-gamut chroma for current hue
+    bc.save();
+    bc.strokeStyle = 'rgba(255,255,255,0.22)';
+    bc.lineWidth = 1;
+    bc.setLineDash([4, 4]);
+    bc.beginPath();
+    let ceilStarted = false;
+    const rampSpan = p.rampLight - p.rampDark;
+    for (let px = 0; px <= W; px += 4) {
+      const L = px / W;
+      const t = rampSpan > 0 ? (p.rampLight - L) / rampSpan : 0.5;
+      const hueAtL = p.hue + p.hueShift * (t - 0.5) * 2;
+      const ceiling = Math.min(findMaxChroma(L, hueAtL), maxC);
+      const y = H - (ceiling / maxC) * H;
+      if (!ceilStarted) { bc.moveTo(px, y); ceilStarted = true; }
+      else { bc.lineTo(px, y); }
+    }
+    bc.stroke();
+    bc.setLineDash([]);
+    bc.restore();
+
+    _curveCache.key = bgKey;
+    _curveCache.canvas = bg;
   }
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.restore();
+
+  // Composite the cached background onto the main canvas.
+  ctx.drawImage(_curveCache.canvas, 0, 0, W, H);
 
   // Step diamonds — subdued when any node is hovered or dragged
   const anyEngaged = curveEditor.dragNodeIdx !== null || curveEditor.hoverNodeIdx !== null;

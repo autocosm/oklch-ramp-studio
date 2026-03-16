@@ -99,7 +99,7 @@ function chromaCurve(L, peakC, peakL, satMult) {
 // t=0 → light end, t=1 → dark end.
 function remapT(t, mode) {
   if (mode === 'linear') return t;
-  if (mode === 'parabolic') return 0.5 - 0.5 * Math.cos(Math.PI * t);
+  if (mode === 'parabolic') { const c = 0.5 - 0.5 * Math.cos(Math.PI * t); return 0.75 * c + 0.25 * t; }
   if (mode === 'adjusted') return Math.pow(t, 0.77);
   return t;
 }
