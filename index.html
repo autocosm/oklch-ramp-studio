@@ -1318,7 +1318,7 @@ function render() {
   // Refresh export output if open
   const out = document.getElementById('export-output');
   if (out.style.display !== 'none' && out.dataset.mode) {
-    exportMode(out.dataset.mode, swatches, p);
+    exportMode(out.dataset.mode, swatches, p, true);
   }
 
   // Refresh hue card dot previews
@@ -1915,7 +1915,15 @@ function getExportName() {
   return document.getElementById('rampName').value.trim().replace(/\s+/g, '-') || 'ramp';
 }
 
-function exportMode(mode, swatches, p) {
+function exportMode(mode, swatches, p, autoRefresh = false) {
+  // During auto-refresh, don't update while the user is typing in a text/number
+  // field — that would steal focus. Range sliders are intentionally exempt so
+  // the panel still updates live while dragging.
+  if (autoRefresh) {
+    const a = document.activeElement;
+    if (a && (a.type === 'number' || a.type === 'text') && a.id !== 'export-output') return;
+  }
+
   const name = getExportName();
   const out  = document.getElementById('export-output');
   out.style.display = 'block';
@@ -1937,8 +1945,10 @@ function exportMode(mode, swatches, p) {
   }
 
   out.value = text;
-  out.select();
-  navigator.clipboard.writeText(text).catch(() => {});
+  if (!autoRefresh) {
+    out.select();
+    navigator.clipboard.writeText(text).catch(() => {});
+  }
 }
 
 function exportCSS()      { exportMode('css',      window._swatches, window._params); }
@@ -2023,7 +2033,7 @@ document.getElementById('sysCountSlider').addEventListener('input', syncSystemHu
 document.getElementById('rampName').addEventListener('input', () => {
   const out = document.getElementById('export-output');
   if (out.style.display !== 'none' && out.dataset.mode) {
-    exportMode(out.dataset.mode, window._swatches, window._params);
+    exportMode(out.dataset.mode, window._swatches, window._params, true);
   }
   if (state.systemEnabled) render();
 });
