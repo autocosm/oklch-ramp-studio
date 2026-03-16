@@ -100,6 +100,19 @@ The remaining chroma curve controls (**Chroma Peak**, **Peak at L**, **Peak Q**,
 | **Steps** | Number of stops in the ramp. Odd values only (3–21). Stop keys are distributed evenly across a 50–950 scale (e.g. 11 steps → 50, 140, 230 … 950). |
 | **Hue shift** | Applies a linear hue rotation from the lightest to darkest stop. +20° on a blue ramp, for example, will push darks slightly toward purple and lights toward cyan — mimicking the natural appearance of pigment. Set to 0 for a clean, hue-stable ramp. The dashed gamut ceiling on the canvas adapts to reflect the shifted hue at each lightness position. |
 
+### Color Space
+
+Controls which perceptual color model is used to convert the ramp's L, C, h values into sRGB hex output. The toggle appears directly below the Hue Shift slider.
+
+| Mode | Behavior |
+|---|---|
+| **OKLCH** | Default. Uses the OKLab color model developed by Björn Ottosson (2020). Gamut mapping, the chroma ceiling overlay, and all ramp calculations run in OKLCH space. |
+| **CIELCH** | Uses CIELAB cylindrical coordinates (CIE L\*C\*h°). The same L, C, h parameter values are scaled to CIELCH natural units — L × 100, C × 300 — before conversion. |
+
+When CIELCH is active, the gamut ceiling overlay on the curve canvas updates to reflect CIELCH's sRGB boundary for the active hue, so the dashed line remains accurate to the active color space.
+
+See [OKLCH vs CIELCH](#oklch-vs-cielch) for guidance on when to use each.
+
 ### L Spacing
 
 Controls how lightness values are distributed across the ramp. All four modes anchor the lightest and darkest stops at the same L values — only the placement of the intermediate stops changes.
@@ -243,6 +256,56 @@ The ordering constraint `curveDark < L-Knee L < Peak at L < R-Knee L < curveLigh
 ### Gamut ceiling overlay
 
 The canvas draws a **dashed white line** showing the maximum in-gamut sRGB chroma at each lightness value for the current hue. This ceiling is computed via binary search across the full L range (0–1) and updates live as you move the Hue or Hue Shift sliders. When Hue Shift is non-zero, each L position on the ceiling reflects the shifted hue that the corresponding ramp step would actually use, so the ceiling accurately represents the gamut constraint that will apply at that step. The ceiling provides an at-a-glance read of how much headroom the chroma curve has before gamut mapping engages.
+
+---
+
+## OKLCH vs CIELCH
+
+### A brief history
+
+**CIELAB** (and its cylindrical form, **CIELCH**) was introduced by the CIE in 1976 as the first widely adopted attempt to create a *perceptually uniform* color space — one where equal numeric distances correspond to equal perceived color differences. It replaced earlier models like Munsell (which required physical samples) with a mathematical formulation derived from opponent-process color theory, using a cube-root–based lightness function and opponent `a*`/`b*` channels.
+
+For two decades CIELAB was the standard for color science, ICC profiles, and industrial color management. It is still embedded in every ICC-aware application, every PDF renderer, and every print workflow.
+
+### The problems with CIELAB
+
+Despite its longevity, CIELAB has known perceptual non-uniformities that have been documented since the 1980s:
+
+- **Hue linearity** — perceived hue does not travel in straight lines through the `a*b*` plane. Blues in particular curve sharply toward purple as chroma increases, so a blue ramp with rising chroma will appear to shift hue even with a fixed `h°` value.
+- **Chroma–lightness coupling** — changing chroma at a fixed `L*` can noticeably shift perceived lightness, particularly in the blue and yellow regions. This makes it difficult to build ramps where every stop feels the same visual weight.
+- **Achromatic axis instability** — very desaturated colors near the neutral axis can produce slight tints in CIELAB due to the cube-root compression behaving differently near zero, causing grays to appear slightly warm or cool.
+
+These issues were tolerable for color *difference* measurements (CIEDE2000 patches them with correction factors) but they create visible problems when generating UI color ramps, where the goal is a smooth, hue-stable, perceptually uniform gradient.
+
+### Why OKLab was created
+
+In 2020, Björn Ottosson published [OKLab](https://bottosson.github.io/posts/oklab/) — a new perceptual color space designed specifically to address CIELAB's non-uniformities. The key insight was to fit the linear transform matrices not to theoretical opponent-process responses, but to empirical data from the [IPT color space](https://www.researchgate.net/publication/221677980) and modern color appearance datasets, using a least-squares optimization over a large set of perceived-equal-difference color pairs.
+
+The result:
+
+- **Straight hue lines** — perceived hue travels in nearly straight lines through the OKLab `ab` plane, so a fixed `h` in OKLCH holds its apparent color identity across a wide chroma range.
+- **Decoupled chroma and lightness** — chroma changes at a fixed `L` produce minimal perceived lightness shift, making it reliable for ramp construction.
+- **Minimal hue shift in blue** — the blue–purple skew that plagues CIELAB is largely eliminated.
+- **Simple math** — the full transform is two 3×3 matrix multiplications and a cube root, with no correction factors or lookup tables.
+
+OKLab was adopted into the CSS Color Level 4 specification as `oklch()` / `oklab()` in 2022 and is now natively supported by all major browsers.
+
+### When to use each
+
+**Use OKLCH (default) when:**
+
+- Building a production UI ramp. OKLCH gives the most predictable hue stability across the lightness range and is the correct choice for anything that will ship.
+- Working with saturated hues, especially blues, teals, or purples — where CIELAB's hue skew is most pronounced.
+- You want the chroma curve you've drawn to translate faithfully to perceived colorfulness at every step.
+- Comparing or exporting alongside CSS `oklch()` values.
+
+**Use CIELCH when:**
+
+- You need to match or cross-reference colors defined in an existing CIELAB-based workflow — ICC profiles, colorimetry reports, print specifications.
+- You want to see the historical CIELAB rendering of a ramp for comparison or academic purposes.
+- Your target rendering pipeline internally uses CIELAB (some older design tools, colorimetric measurements, textile industry workflows).
+
+For most web and product design work, the differences between OKLCH and CIELCH are subtle in the midtones but clearly visible at high chroma, particularly for blues and warm yellows. Toggling between the two is the fastest way to see whether the non-uniformities in CIELAB are materially affecting your ramp.
 
 ---
 
