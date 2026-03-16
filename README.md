@@ -32,11 +32,11 @@ Click any swatch or hex chip to copy that value to the clipboard. Use the Export
 
 A **DARK / LIGHT** toggle in the header switches the entire page chrome — all backgrounds, borders, text, and UI surfaces — between a near-black dark theme and an off-white light theme via CSS custom property overrides. This lets you evaluate ramp swatches against the same kind of surface they'll actually appear on in your product.
 
-### WCAG Contrast Check
+### Contrast Check
 
-A **WCAG OFF / WCAG ON** toggle in the header enables accessibility contrast checking on the swatch row. When on, each swatch displays a centered badge showing its WCAG rating and the exact contrast ratio (e.g. `AA` / `8.2:1`). The badge text color — black or white — is chosen by whichever achieves the higher contrast ratio against that swatch, using the WCAG relative luminance formula. This also governs the color of the hex value label on each swatch while the check is active.
+An **OFF / WCAG / APCA** toggle in the header enables accessibility contrast checking on the swatch row. When active, each swatch displays a centered badge showing the contrast rating and value. The badge text color — black or white — is chosen by whichever achieves the higher contrast against that swatch, using the WCAG relative luminance formula. This also governs the color of the hex value label on each swatch while checking is active.
 
-Ratings follow WCAG 2.1 thresholds for normal text:
+**WCAG mode** uses the WCAG 2.1 relative luminance formula and reports contrast as a ratio against white or black (whichever is higher):
 
 | Badge | Contrast ratio | Meaning |
 |---|---|---|
@@ -44,7 +44,16 @@ Ratings follow WCAG 2.1 thresholds for normal text:
 | **AA** | ≥ 4.5:1 | Minimum — passes normal text |
 | **—** | < 4.5:1 | Fail — text on this stop requires care |
 
-The contrast ratio line is hidden at narrow viewport widths to avoid overlap with the hex label.
+**APCA mode** uses the APCA 0.0.98G algorithm (the W3C candidate for WCAG 3.0) and reports contrast in Lc (Lightness Contrast) units. APCA models perceived contrast more accurately than WCAG 2.x, particularly for mid-tone colors and reversed-polarity text. The badge shows the Lc category and the raw value (e.g. `Lc75` / `87.3`):
+
+| Badge | Lc value | Meaning |
+|---|---|---|
+| **Lc75** | ≥ 75 | Passes for body text |
+| **Lc60** | ≥ 60 | Passes for large or bold text |
+| **Lc45** | ≥ 45 | Passes for large headings and UI elements |
+| **—** | < 45 | Below minimum recommended threshold |
+
+The second line of the badge (ratio or Lc value) is hidden at narrow viewport widths to avoid overlap with the hex label.
 
 ### Ramp Display
 
