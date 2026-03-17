@@ -895,6 +895,16 @@
 
     <div class="toggle-row" style="margin-top:10px;">
       <div>
+        <span class="toggle-label">Smoothing</span>
+      </div>
+      <div class="toggle-btn">
+        <div class="toggle-opt" id="opt-smooth-yes" onclick="setSmooth(true)">YES</div>
+        <div class="toggle-opt active" id="opt-smooth-no" onclick="setSmooth(false)">NO</div>
+      </div>
+    </div>
+
+    <div class="toggle-row" style="margin-top:10px;">
+      <div>
         <span class="toggle-label">Color space</span>
       </div>
       <div class="toggle-btn">
@@ -1279,6 +1289,7 @@ const state = {
   lSpacing: 'linear',
   colorSpace: 'oklch',
   contrastMode: 'off',
+  smooth: false,
   systemEnabled: false,
   systemHues: []   // [{hue:number, name:string}]
 };
@@ -1314,6 +1325,7 @@ function getParams() {
     rampDark:   +document.getElementById('darkEndSlider').value,
     steps:      +document.getElementById('stepsSlider').value,
     hueShift:   +document.getElementById('hueShiftSlider').value,
+    smooth:     state.smooth,
     gamut:      state.gamut,
     compRatio:  state.compRatio,
     lSpacing:   state.lSpacing,
@@ -1426,6 +1438,26 @@ function generateRamp(p, overrideHue) {
     const stepKey = Math.round(tLinear * 900 + 50);
     swatches.push({ L, C, h: hueAtStep, hex, clipped, actualC, step: stepKey, index: i });
   }
+
+  // Apex smoothing: set the highest post-gamut chroma step to the average of its neighbors
+  if (p.smooth && swatches.length >= 3) {
+    const plotC = s => (s.clipped && s.actualC !== undefined) ? s.actualC : s.C;
+    let apexIdx = 0;
+    for (let i = 1; i < swatches.length; i++) {
+      if (plotC(swatches[i]) > plotC(swatches[apexIdx])) apexIdx = i;
+    }
+    if (apexIdx > 0 && apexIdx < swatches.length - 1) {
+      const apex = swatches[apexIdx];
+      const avgNeighborC = (plotC(swatches[apexIdx - 1]) + plotC(swatches[apexIdx + 1])) / 2;
+      const smoothedC = (plotC(apex) + avgNeighborC) / 2;
+      const { hex, clipped, actualC } = colorToHex(apex.L, smoothedC, apex.h, p.gamut, p.compRatio, p.colorSpace);
+      apex.hex = hex;
+      apex.clipped = clipped;
+      apex.actualC = actualC;
+      apex.C = smoothedC;
+    }
+  }
+
   return swatches;
 }
 
@@ -1972,6 +2004,13 @@ function setColorSpace(mode) {
   document.getElementById('opt-cs-cielchuv').classList.toggle('active', mode === 'cielchuv');
   document.getElementById('opt-cs-srlch').classList.toggle('active',    mode === 'srlch');
   updateHueGradient(mode);
+  render();
+}
+
+function setSmooth(enabled) {
+  state.smooth = enabled;
+  document.getElementById('opt-smooth-yes').classList.toggle('active',  enabled);
+  document.getElementById('opt-smooth-no').classList.toggle('active',  !enabled);
   render();
 }
 
