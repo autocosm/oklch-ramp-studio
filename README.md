@@ -46,13 +46,13 @@ An **OFF / WCAG / APCA** toggle in the header enables accessibility contrast che
 | **AA** | ≥ 4.5:1 | Minimum — passes normal text |
 | **—** | < 4.5:1 | Fail — text on this stop requires care |
 
-**APCA mode** uses the APCA 0.0.98G algorithm (the W3C candidate for WCAG 3.0) and reports contrast in Lc (Lightness Contrast) units. APCA models perceived contrast more accurately than WCAG 2.x, particularly for mid-tone colors and reversed-polarity text. The badge shows the Lc category and the raw value (e.g. `Lc75` / `87.3`):
+**APCA mode** uses the APCA 0.0.98G algorithm (the W3C candidate for WCAG 3.0) and reports contrast in Lc (Lightness Contrast) units. APCA models perceived contrast more accurately than WCAG 2.x, particularly for mid-tone colors and reversed-polarity text. The badge shows the Lc threshold level and the raw value (e.g. `75` / `87.3`):
 
 | Badge | Lc value | Meaning |
 |---|---|---|
-| **Lc75** | ≥ 75 | Passes for body text |
-| **Lc60** | ≥ 60 | Passes for large or bold text |
-| **Lc45** | ≥ 45 | Passes for large headings and UI elements |
+| **75** | ≥ 75 | Passes for body text |
+| **60** | ≥ 60 | Passes for large or bold text |
+| **45** | ≥ 45 | Passes for large headings and UI elements |
 | **—** | < 45 | Below minimum recommended threshold |
 
 The second line of the badge (ratio or Lc value) is hidden at narrow viewport widths to avoid overlap with the hex label.
