@@ -99,6 +99,9 @@ A full-width interactive editor that sits above the control panels and serves as
 |---|---|
 | **Hue** | Base hue angle in degrees (0–360). The slider track renders a live perceptual hue gradient. |
 | **Saturation** | A multiplier applied to the entire chroma curve. 1.0 = curve as-is; values below 1 produce more neutral/muted ramps; values above 1 push toward maximum chroma. |
+| **Hue shift** | Applies a linear hue rotation from the lightest to darkest stop. +20° on a blue ramp, for example, will push darks slightly toward purple and lights toward cyan — mimicking the natural appearance of pigment. Set to 0 for a clean, hue-stable ramp. The dashed gamut ceiling on the canvas adapts to reflect the shifted hue at each lightness position. |
+| **Color space** | Controls which perceptual color model is used to convert L, C, h values into sRGB hex output. **OKLCH** (default) uses OKLab (Björn Ottosson, 2020). **SRLCH** uses SRLAB2 cylindrical coordinates (Jan Behrens, 2011), scaling L × 100 and C × 300 to SRLAB2 natural units. **CIELCH** uses CIE L\*C\*h° (CIELAB cylindrical), scaling identically. When SRLCH or CIELCH is active, the gamut ceiling overlay updates to reflect that space's sRGB boundary. See [OKLCH vs CIELCH vs SRLCH](#oklch-vs-cielch-vs-srlch) for guidance. |
+| **Out-of-gamut** | Controls how colors outside the sRGB triangle are handled. **SMART** binary-searches for the highest in-gamut chroma at the same L and h — hue and lightness fully preserved; recommended for design systems. **NAIVE** clips RGB channels directly — fast but colors shift in both hue and lightness. **COMP** applies per-channel ratio compression: excess chroma above the gamut ceiling is attenuated by the **Ratio** (1.5:1–20:1) rather than hard-cut, preserving more saturation intent with a small lightness drift. |
 
 The remaining chroma curve controls (**Chroma Peak**, **Peak at L**, **Peak Q**, **L-Knee L/C**, **R-Knee L/C**, **Curve dark**, **Curve light**) appear in the node tab row below the canvas — click the corresponding tab or canvas node to expand its controls.
 
@@ -109,21 +112,6 @@ The remaining chroma curve controls (**Chroma Peak**, **Peak at L**, **Peak Q**,
 | **Ramp light** | Lightness of the lightest stop (step 50). Default 0.97 ≈ near-white. Independent of the chroma curve's light anchor — steps that fall outside the curve anchor range simply receive zero chroma. |
 | **Ramp dark** | Lightness of the darkest stop (step 950). Default 0.12 ≈ very dark. Independent of the chroma curve's dark anchor. |
 | **Steps** | Number of stops in the ramp. Odd values only (3–21). Stop keys are distributed evenly across a 50–950 scale (e.g. 11 steps → 50, 140, 230 … 950). |
-| **Hue shift** | Applies a linear hue rotation from the lightest to darkest stop. +20° on a blue ramp, for example, will push darks slightly toward purple and lights toward cyan — mimicking the natural appearance of pigment. Set to 0 for a clean, hue-stable ramp. The dashed gamut ceiling on the canvas adapts to reflect the shifted hue at each lightness position. |
-
-### Color Space
-
-Controls which perceptual color model is used to convert the ramp's L, C, h values into sRGB hex output. The toggle appears directly below the Hue Shift slider.
-
-| Mode | Behavior |
-|---|---|
-| **OKLCH** | Default. Uses the OKLab color model developed by Björn Ottosson (2020). Gamut mapping, the chroma ceiling overlay, and all ramp calculations run in OKLCH space. |
-| **SRLCH** | Uses SRLAB2 cylindrical coordinates (srL\*C\*h°). Jan Behrens (2011). L, C, h parameter values are scaled to SRLAB2 natural units — L × 100, C × 300 — before conversion. Retains CIELAB's nonlinearity and 0–100 L\* scale while reducing hue non-uniformities through a re-optimized pre-nonlinearity matrix. |
-| **CIELCH** | Uses CIELAB cylindrical coordinates (CIE L\*C\*h°). The same L, C, h parameter values are scaled to CIELCH natural units — L × 100, C × 300 — before conversion. |
-
-When CIELCH or SRLCH is active, the gamut ceiling overlay on the curve canvas updates to reflect that space's sRGB boundary for the active hue, so the dashed line remains accurate to the active color space.
-
-See [OKLCH vs CIELCH vs SRLCH](#oklch-vs-cielch-vs-srlch) for guidance on when to use each.
 
 ### L Spacing
 
@@ -149,8 +137,6 @@ okLCh can describe colors that lie outside the sRGB triangle. The gamut toggle o
 | **COMP** | Chroma-space ratio compression. For each step, the maximum in-gamut chroma at that exact L and h is found via binary search. If the requested chroma exceeds this ceiling, the excess is retained but attenuated by the compression ratio rather than hard-cut. Because hue is never touched, the result preserves more of the original saturation intent while introducing only a small lightness drift — and because the gamut ceiling varies by hue angle, the effect is uneven across the ramp, producing character that changes as you move the Hue slider. |
 
 **Ratio** (COMP mode only, 1.5:1 to 20:1): Controls how aggressively excess chroma is attenuated. Low ratios like 2:1 retain most of the excess — more character, more drift. High ratios like 16:1 approach hard-clip behavior, converging toward NAIVE. The 3:1–6:1 range tends to be most useful.
-
-Each step shows a **✓** (in gamut) or **⚠** (compressed/clipped) chip below the controls.
 
 ### Color System View
 

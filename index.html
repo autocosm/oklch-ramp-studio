@@ -341,18 +341,8 @@
   .toggle-opt.active { background: var(--accent2); color: white; }
 
   /* ── GAMUT CHIPS ── */
-  .gamut-bar { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
 
-  .gamut-chip {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 9px;
-    padding: 2px 6px;
-    border-radius: 2px;
-    letter-spacing: 0.06em;
-  }
 
-  .gamut-chip.in  { background: rgba(110,248,176,0.1); color: var(--success); border: 1px solid rgba(110,248,176,0.2); }
-  .gamut-chip.out { background: rgba(248,124,110,0.1); color: var(--danger);  border: 1px solid rgba(248,124,110,0.2); }
 
   /* ── EXPORT PANEL ── */
   .export-panel {
@@ -898,6 +888,40 @@
       <input type="number" class="slider-val" id="satVal" min="0" max="2" step="0.01" value="1">
     </div>
 
+    <div class="slider-row">
+      <span class="slider-label">Hue shift</span>
+      <input type="range" id="hueShiftSlider" min="-30" max="30" step="0.5" value="0">
+      <input type="number" class="slider-val" id="hueShiftVal" min="-30" max="30" step="0.5" value="0">
+    </div>
+
+    <div class="toggle-row" style="margin-top:10px;">
+      <div>
+        <span class="toggle-label">Color space</span>
+      </div>
+      <div class="toggle-btn">
+        <div class="toggle-opt active" id="opt-cs-oklch"  onclick="setColorSpace('oklch')">OKLCH</div>
+        <div class="toggle-opt"        id="opt-cs-srlch"  onclick="setColorSpace('srlch')">SRLCH</div>
+        <div class="toggle-opt"        id="opt-cs-cielch" onclick="setColorSpace('cielch')">CIELCH</div>
+      </div>
+    </div>
+
+    <div class="toggle-row" style="margin-top:10px;">
+      <div>
+        <span class="toggle-label">Out-of-gamut</span>
+      </div>
+      <div class="toggle-btn">
+        <div class="toggle-opt active" id="opt-smart"    onclick="setGamut('smart')">SMART</div>
+        <div class="toggle-opt"        id="opt-naive"    onclick="setGamut('naive')">NAIVE</div>
+        <div class="toggle-opt"        id="opt-compress" onclick="setGamut('compress')">COMP</div>
+      </div>
+    </div>
+    <!-- Ratio slider — only visible in COMP mode -->
+    <div class="slider-row" id="comp-ratio-row" style="display:none;margin-top:10px;">
+      <span class="slider-label">Ratio</span>
+      <input type="range" id="compRatioSlider" min="1.5" max="20" step="0.5" value="4">
+      <input type="number" class="slider-val" id="compRatioVal" min="1.5" max="20" step="0.5" value="4">
+    </div>
+
   </div>
 
   <!-- Lightness Range & Steps -->
@@ -922,28 +946,9 @@
       <input type="number" class="slider-val" id="stepsVal" min="3" max="21" step="2" value="11">
     </div>
 
-    <div class="slider-row">
-      <span class="slider-label">Hue shift</span>
-      <input type="range" id="hueShiftSlider" min="-30" max="30" step="0.5" value="0">
-      <input type="number" class="slider-val" id="hueShiftVal" min="-30" max="30" step="0.5" value="0">
-    </div>
-
-    <div class="toggle-row" style="margin-top:10px;">
-      <div>
-        <span class="toggle-label">Color space</span>
-        <span class="toggle-desc">OkLCH = Björn Ottosson's perceptual model · SRLCH = SRLAB2 (Behrens 2011) · CIELCH = CIE L*C*h° (CIELAB cylindrical)</span>
-      </div>
-      <div class="toggle-btn">
-        <div class="toggle-opt active" id="opt-cs-oklch"  onclick="setColorSpace('oklch')">OKLCH</div>
-        <div class="toggle-opt"        id="opt-cs-srlch"  onclick="setColorSpace('srlch')">SRLCH</div>
-        <div class="toggle-opt"        id="opt-cs-cielch" onclick="setColorSpace('cielch')">CIELCH</div>
-      </div>
-    </div>
-
     <div class="toggle-row" style="margin-top:10px;">
       <div>
         <span class="toggle-label">L spacing</span>
-        <span class="toggle-desc">Linear = equal L steps · Para = denser near extremes · Adj = perceptually equal · Arc = equal LC curve distance</span>
       </div>
       <div class="toggle-btn">
         <div class="toggle-opt active" id="opt-lsp-linear"   onclick="setLSpacing('linear')">LINEAR</div>
@@ -953,27 +958,6 @@
       </div>
     </div>
 
-    <div style="margin-top:4px;">
-      <div class="panel-title" style="margin-bottom:8px;">// Gamut handling</div>
-      <div class="toggle-row">
-        <div>
-          <span class="toggle-label">Out-of-gamut</span>
-          <span class="toggle-desc" id="gamut-desc">Smart = preserve hue · Naive = allow hue shift · Comp = per-channel ratio</span>
-        </div>
-        <div class="toggle-btn">
-          <div class="toggle-opt active" id="opt-smart"    onclick="setGamut('smart')">SMART</div>
-          <div class="toggle-opt"        id="opt-naive"    onclick="setGamut('naive')">NAIVE</div>
-          <div class="toggle-opt"        id="opt-compress" onclick="setGamut('compress')">COMP</div>
-        </div>
-      </div>
-      <!-- Ratio slider — only visible in COMP mode -->
-      <div class="slider-row" id="comp-ratio-row" style="display:none;margin-top:10px;">
-        <span class="slider-label">Ratio</span>
-        <input type="range" id="compRatioSlider" min="1.5" max="20" step="0.5" value="4">
-        <input type="number" class="slider-val" id="compRatioVal" min="1.5" max="20" step="0.5" value="4">
-      </div>
-      <div class="gamut-bar" id="gamutBar"></div>
-    </div>
   </div>
 
   <!-- Export -->
@@ -1482,16 +1466,6 @@ function render() {
     `;
     el.onclick = () => copyText(s.hex);
     row.appendChild(el);
-  });
-
-  // Gamut chips
-  const gamutBar = document.getElementById('gamutBar');
-  gamutBar.innerHTML = '';
-  swatches.forEach(s => {
-    const chip = document.createElement('span');
-    chip.className = `gamut-chip ${s.clipped ? 'out' : 'in'}`;
-    chip.textContent = `${s.step} ${s.clipped ? '⚠' : '✓'}`;
-    gamutBar.appendChild(chip);
   });
 
   drawCurve(p);
