@@ -900,7 +900,8 @@
       <div class="toggle-btn">
         <div class="toggle-opt active" id="opt-cs-oklch"  onclick="setColorSpace('oklch')">OKLCH</div>
         <div class="toggle-opt"        id="opt-cs-srlch"  onclick="setColorSpace('srlch')">SRLCH</div>
-        <div class="toggle-opt"        id="opt-cs-cielch" onclick="setColorSpace('cielch')">CIELCH</div>
+        <div class="toggle-opt"        id="opt-cs-cielch"   onclick="setColorSpace('cielch')">CIELCH</div>
+        <div class="toggle-opt"        id="opt-cs-cielchuv" onclick="setColorSpace('cielchuv')">LCHUV</div>
       </div>
     </div>
 
@@ -1050,12 +1051,14 @@ function cielchToLinearRGB(L, C, h) {
   ];
 }
 
-// Scales to convert UI-space (OKLCH-normalised) L and C to CIELCH / SRLCH natural units.
-// OKLCH L [0,1] ↔ CIELCH/SRLAB2 L* [0,100];  OKLCH C [0,~0.4] ↔ C* [0,~120].
-const CIELCH_L_SCALE = 100;
-const CIELCH_C_SCALE = 300;
-const SRLCH_L_SCALE  = 100;
-const SRLCH_C_SCALE  = 300;
+// Scales to convert UI-space (OKLCH-normalised) L and C to CIELCH / CIELCHUV / SRLCH natural units.
+// OKLCH L [0,1] ↔ CIELCH/CIELCHUV/SRLAB2 L* [0,100];  OKLCH C [0,~0.4] ↔ C* [0,~120].
+const CIELCH_L_SCALE   = 100;
+const CIELCH_C_SCALE   = 300;
+const CIELCHUV_L_SCALE = 100;
+const CIELCHUV_C_SCALE = 300;
+const SRLCH_L_SCALE    = 100;
+const SRLCH_C_SCALE    = 300;
 
 // SRLAB2 (Jan Behrens 2011) cylindrical srL*C*h° → linear sRGB.
 // L in [0, 100], C in [0, ~150], h in degrees.
@@ -1078,9 +1081,36 @@ function srlchToLinearRGB(L, C, h) {
   ];
 }
 
+// CIELChUV (cylindrical CIELUV) → linear sRGB.  L in [0,100], C in [0,~170], h in degrees.
+function cielchuvToLinearRGB(L, C, h) {
+  if (L <= 0) return [0, 0, 0];
+  const hr = h * Math.PI / 180;
+  const uStar = C * Math.cos(hr);
+  const vStar = C * Math.sin(hr);
+  // Y via same inverse lightness as CIELAB (Yn=1 so Y = labF(fy))
+  const fy = (L + 16) / 116;
+  const t0 = 6 / 29;
+  const labF = t => t > t0 ? t * t * t : 3 * t0 * t0 * (t - 4 / 29);
+  const Y = labF(fy);
+  // u', v' chromaticity (D65 reference white)
+  const u_n = 0.19783001, v_n = 0.46831999;
+  const uPrime = uStar / (13 * L) + u_n;
+  const vPrime = vStar / (13 * L) + v_n;
+  // XYZ (D65)
+  const X = 9 * Y * uPrime / (4 * vPrime);
+  const Z = Y * (12 - 3 * uPrime - 20 * vPrime) / (4 * vPrime);
+  // XYZ (D65) → linear sRGB
+  return [
+    +3.2404542 * X - 1.5371385 * Y - 0.4985314 * Z,
+    -0.9692660 * X + 1.8760108 * Y + 0.0415560 * Z,
+    +0.0556434 * X - 0.2040259 * Y + 1.0572252 * Z
+  ];
+}
+
 function uiToLinearRGB(L, C, h, colorSpace) {
-  if (colorSpace === 'cielch') return cielchToLinearRGB(L * CIELCH_L_SCALE, C * CIELCH_C_SCALE, h);
-  if (colorSpace === 'srlch')  return srlchToLinearRGB(L * SRLCH_L_SCALE,  C * SRLCH_C_SCALE,  h);
+  if (colorSpace === 'cielch')   return cielchToLinearRGB(L * CIELCH_L_SCALE,     C * CIELCH_C_SCALE,   h);
+  if (colorSpace === 'cielchuv') return cielchuvToLinearRGB(L * CIELCHUV_L_SCALE, C * CIELCHUV_C_SCALE, h);
+  if (colorSpace === 'srlch')    return srlchToLinearRGB(L * SRLCH_L_SCALE,       C * SRLCH_C_SCALE,    h);
   return oklchToLinearRGB(L, C, h);
 }
 
@@ -1934,9 +1964,10 @@ function updateHueGradient(colorSpace) {
 
 function setColorSpace(mode) {
   state.colorSpace = mode;
-  document.getElementById('opt-cs-oklch').classList.toggle('active',  mode === 'oklch');
-  document.getElementById('opt-cs-cielch').classList.toggle('active', mode === 'cielch');
-  document.getElementById('opt-cs-srlch').classList.toggle('active',  mode === 'srlch');
+  document.getElementById('opt-cs-oklch').classList.toggle('active',    mode === 'oklch');
+  document.getElementById('opt-cs-cielch').classList.toggle('active',   mode === 'cielch');
+  document.getElementById('opt-cs-cielchuv').classList.toggle('active', mode === 'cielchuv');
+  document.getElementById('opt-cs-srlch').classList.toggle('active',    mode === 'srlch');
   updateHueGradient(mode);
   render();
 }

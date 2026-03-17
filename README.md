@@ -100,7 +100,7 @@ A full-width interactive editor that sits above the control panels and serves as
 | **Hue** | Base hue angle in degrees (0–360). The slider track renders a live perceptual hue gradient. |
 | **Saturation** | A multiplier applied to the entire chroma curve. 1.0 = curve as-is; values below 1 produce more neutral/muted ramps; values above 1 push toward maximum chroma. |
 | **Hue shift** | Applies a linear hue rotation from the lightest to darkest stop. +20° on a blue ramp, for example, will push darks slightly toward purple and lights toward cyan — mimicking the natural appearance of pigment. Set to 0 for a clean, hue-stable ramp. The dashed gamut ceiling on the canvas adapts to reflect the shifted hue at each lightness position. |
-| **Color space** | Controls which perceptual color model is used to convert L, C, h values into sRGB hex output. **OKLCH** (default) uses OKLab (Björn Ottosson, 2020). **SRLCH** uses SRLAB2 cylindrical coordinates (Jan Behrens, 2011), scaling L × 100 and C × 300 to SRLAB2 natural units. **CIELCH** uses CIE L\*C\*h° (CIELAB cylindrical), scaling identically. When SRLCH or CIELCH is active, the gamut ceiling overlay updates to reflect that space's sRGB boundary. See [OKLCH vs CIELCH vs SRLCH](#oklch-vs-cielch-vs-srlch) for guidance. |
+| **Color space** | Controls which perceptual color model is used to convert L, C, h values into sRGB hex output. **OKLCH** (default) uses OKLab (Björn Ottosson, 2020). **SRLCH** uses SRLAB2 cylindrical coordinates (Jan Behrens, 2011), scaling L × 100 and C × 300 to SRLAB2 natural units. **CIELCH** uses CIE L\*C\*h° (CIELAB cylindrical), scaling identically. **LCHUV** uses CIELChUV, the cylindrical form of CIELUV — the same L\* definition as CIELAB but with u\*/v\* chromatic axes derived from the CIE 1976 UCS diagram, also scaling L × 100 and C × 300. When any non-OKLCH space is active, the hue gradient and gamut ceiling overlay update to reflect that space's sRGB boundary. See [Comparing color spaces](#comparing-color-spaces) for guidance. |
 | **Out-of-gamut** | Controls how colors outside the sRGB triangle are handled. **SMART** binary-searches for the highest in-gamut chroma at the same L and h — hue and lightness fully preserved; recommended for design systems. **NAIVE** clips RGB channels directly — fast but colors shift in both hue and lightness. **COMP** applies per-channel ratio compression: excess chroma above the gamut ceiling is attenuated by the **Ratio** (1.5:1–20:1) rather than hard-cut, preserving more saturation intent with a small lightness drift. |
 
 The remaining chroma curve controls (**Peak L**, **Peak C**, **Peak Q**, **L-Knee L/C**, **R-Knee L/C**, **Curve dark**, **Curve light**) appear in the node tab row below the canvas — click the corresponding tab or canvas node to expand its controls.
@@ -261,7 +261,7 @@ The canvas draws a **dashed white line** showing the maximum in-gamut sRGB chrom
 
 ---
 
-## OKLCH vs CIELCH vs SRLCH
+## Comparing color spaces
 
 ### A brief history
 
@@ -292,6 +292,14 @@ The result:
 
 OKLab was adopted into the CSS Color Level 4 specification as `oklch()` / `oklab()` in 2022 and is now natively supported by all major browsers.
 
+### CIELUV and CIELChUV
+
+CIELUV was published by the CIE in 1976 alongside CIELAB — both were attempts at perceptual uniformity, and neither was declared the winner. CIELAB uses opponent-process `a*`/`b*` axes derived from a cube-root compression of XYZ. CIELUV takes a different approach: it applies a projective transform of XYZ to the *CIE 1976 UCS chromaticity diagram* (`u'v'`), then scales by L\* to produce `u*`/`v*` opponent channels. The result is a different chromatic structure — CIELUV hue angles are not the same as CIELAB hue angles for the same physical color.
+
+CIELUV was historically favored in the **lighting and illumination industry**, where additive color mixtures (light sources, displays, luminaires) are common and the projective chromaticity structure aligns better with how emitted light mixes. CIELAB became dominant in the **print and colorimetry industry**, where reflectance and subtractive mixing are primary. Both spaces share the same L\* definition and the same known non-uniformities in hue linearity and chroma–lightness coupling — they differ primarily in which chromatic axes they use to express color differences.
+
+CIELChUV is the cylindrical projection: `C*_uv = sqrt(u*² + v*²)` and `h_uv = atan2(v*, u*)`. It is comparable to CIELCH in structure but with a different hue rotation and different gamut boundaries in the u\*v\* plane.
+
 ### Why SRLAB2 was created
 
 In 2011, Jan Behrens published [SRLAB2](https://www.magnetkern.de/srlab2.html) as an intermediate position between CIELAB and the more recent perceptual models. Where CIELAB applies its cube-root nonlinearity to XYZ values scaled by the D65 reference white directly, SRLAB2 first passes those XYZ values through a re-optimized chromatic adaptation transform (based on CAT02 cone responses with Hunt-Pointer-Estevez primaries for the inverse). The resulting pre-nonlinearity values are a better substrate for the cube-root step, reducing the same blue–purple hue skew and chroma–lightness coupling that Ottosson later addressed in OKLab.
@@ -315,13 +323,19 @@ OKLab goes further — its linear transforms were fit empirically to perceptual 
 - You want to see the historical CIELAB rendering of a ramp for comparison or academic purposes.
 - Your target rendering pipeline internally uses CIELAB (some older design tools, colorimetric measurements, textile industry workflows).
 
+**Use LCHUV when:**
+
+- You need to cross-reference colors defined in a CIELUV-based workflow — display colorimetry, illumination engineering, or lighting-industry color specifications.
+- You want to compare CIELUV's chromatic structure against CIELAB for the same ramp (the two spaces produce noticeably different hue distributions, particularly in the yellow-green and blue-cyan regions).
+- Academic or research contexts where CIELUV is the reference standard.
+
 **Use SRLCH when:**
 
 - You want CIELAB's familiar L\*C\*h° framework and 0–100 L\* scale with reduced hue skew.
 - Comparing against SRLAB2-based tools or validating an SRLAB2 implementation.
 - Academic or research contexts where SRLAB2 is the reference standard.
 
-For most web and product design work, the differences between OKLCH and CIELCH are subtle in the midtones but clearly visible at high chroma, particularly for blues and warm yellows. SRLCH produces ramps noticeably better than CIELCH and comparable to OKLCH, with the most visible improvement in the blue and violet hue range. For production UI work, OKLCH remains the recommended default.
+For most web and product design work, the differences between OKLCH and CIELCH are subtle in the midtones but clearly visible at high chroma, particularly for blues and warm yellows. LCHUV produces a distinctly different hue distribution than CIELCH — the hue angles map differently to sRGB primaries — most visibly in the yellow-green and cyan regions. SRLCH produces ramps noticeably better than CIELCH and comparable to OKLCH, with the most visible improvement in the blue and violet hue range. For production UI work, OKLCH remains the recommended default.
 
 The images below show full hue-spectrum matrices — every hue from 0° to 360° across the columns, ramp stops 50–950 down the rows — rendered first in **OKLCH** and then in **SRLCH**, each in dark and light mode:
 

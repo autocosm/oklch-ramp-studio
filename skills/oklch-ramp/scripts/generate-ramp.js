@@ -59,12 +59,36 @@ function srlchToLinearRGB(L, C, h) {
   ];
 }
 
-const CIELCH_L_SCALE = 100, CIELCH_C_SCALE = 300;
-const SRLCH_L_SCALE  = 100, SRLCH_C_SCALE  = 300;
+const CIELCH_L_SCALE   = 100, CIELCH_C_SCALE   = 300;
+const CIELCHUV_L_SCALE = 100, CIELCHUV_C_SCALE = 300;
+const SRLCH_L_SCALE    = 100, SRLCH_C_SCALE    = 300;
+
+// CIELChUV (cylindrical CIELUV) → linear sRGB.  L in [0,100], C in [0,~170], h in degrees.
+function cielchuvToLinearRGB(L, C, h) {
+  if (L <= 0) return [0, 0, 0];
+  const hr = h * Math.PI / 180;
+  const uStar = C * Math.cos(hr);
+  const vStar = C * Math.sin(hr);
+  const fy = (L + 16) / 116;
+  const t0 = 6 / 29;
+  const labF = t => t > t0 ? t * t * t : 3 * t0 * t0 * (t - 4 / 29);
+  const Y = labF(fy);
+  const u_n = 0.19783001, v_n = 0.46831999;
+  const uPrime = uStar / (13 * L) + u_n;
+  const vPrime = vStar / (13 * L) + v_n;
+  const X = 9 * Y * uPrime / (4 * vPrime);
+  const Z = Y * (12 - 3 * uPrime - 20 * vPrime) / (4 * vPrime);
+  return [
+    +3.2404542 * X - 1.5371385 * Y - 0.4985314 * Z,
+    -0.9692660 * X + 1.8760108 * Y + 0.0415560 * Z,
+    +0.0556434 * X - 0.2040259 * Y + 1.0572252 * Z
+  ];
+}
 
 function uiToLinearRGB(L, C, h, colorSpace) {
-  if (colorSpace === 'cielch') return cielchToLinearRGB(L * CIELCH_L_SCALE, C * CIELCH_C_SCALE, h);
-  if (colorSpace === 'srlch')  return srlchToLinearRGB(L * SRLCH_L_SCALE,  C * SRLCH_C_SCALE,  h);
+  if (colorSpace === 'cielch')   return cielchToLinearRGB(L * CIELCH_L_SCALE,     C * CIELCH_C_SCALE,   h);
+  if (colorSpace === 'cielchuv') return cielchuvToLinearRGB(L * CIELCHUV_L_SCALE, C * CIELCHUV_C_SCALE, h);
+  if (colorSpace === 'srlch')    return srlchToLinearRGB(L * SRLCH_L_SCALE,       C * SRLCH_C_SCALE,    h);
   return oklchToLinearRGB(L, C, h);
 }
 
@@ -228,7 +252,7 @@ function parseArgs(argv) {
     gamut:      get('--gamut', 'smart'),       // smart | naive | compress
     compRatio:  parseFloat(get('--compRatio', '4')),
     lSpacing:   get('--spacing', 'linear'),    // linear | parabolic | adjusted
-    colorSpace: get('--colorSpace', 'oklch'), // oklch | cielch | srlch
+    colorSpace: get('--colorSpace', 'oklch'), // oklch | cielch | cielchuv | srlch
     format:     get('--format', 'css'),        // css | json | scss | tailwind | hex
     name:       get('--name', 'color'),
   };
