@@ -448,11 +448,17 @@
     margin-bottom: 3px;
   }
   .node-tab-vals {
+    display: flex;
+    flex-direction: row;
+    gap: 6px;
     font-size: 9px;
     letter-spacing: 0.04em;
     color: var(--muted);
   }
   .node-tab.active .node-tab-vals { color: var(--accent); opacity: 0.7; }
+  @media (max-width: 600px) {
+    .node-tab-vals { flex-direction: column; gap: 1px; }
+  }
 
   /* ── SCROLLBAR ── */
   ::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -771,7 +777,6 @@
 
   <!-- Chroma Curve — interactive drag editor -->
   <div class="curve-panel">
-    <div class="panel-title">// Chroma Curve</div>
     <canvas id="curve-canvas"></canvas>
   </div>
 
@@ -785,15 +790,15 @@
       </div>
       <div class="node-tab" data-node-tab="1" onclick="selectNodeTab(1)">
         <span class="node-tab-label">L-Knee</span>
-        <span class="node-tab-vals" id="tab-vals-1">L —  C —</span>
+        <span class="node-tab-vals" id="tab-vals-1"><span id="tab-vals-1-l">L —</span><span id="tab-vals-1-c">C —</span></span>
       </div>
       <div class="node-tab" data-node-tab="2" onclick="selectNodeTab(2)">
         <span class="node-tab-label">Peak</span>
-        <span class="node-tab-vals" id="tab-vals-2">C —  L —  Q —</span>
+        <span class="node-tab-vals" id="tab-vals-2"><span id="tab-vals-2-l">L —</span><span id="tab-vals-2-c">C —</span></span>
       </div>
       <div class="node-tab" data-node-tab="3" onclick="selectNodeTab(3)">
         <span class="node-tab-label">R-Knee</span>
-        <span class="node-tab-vals" id="tab-vals-3">L —  C —</span>
+        <span class="node-tab-vals" id="tab-vals-3"><span id="tab-vals-3-l">L —</span><span id="tab-vals-3-c">C —</span></span>
       </div>
       <div class="node-tab" data-node-tab="4" onclick="selectNodeTab(4)">
         <span class="node-tab-label">Light</span>
@@ -826,14 +831,14 @@
 
       <div class="node-controls" data-node="2" hidden>
         <div class="slider-row">
-          <span class="slider-label">Chroma Peak</span>
-          <input type="range" id="peakChromaSlider" min="0.05" max="0.38" step="0.005" value="0.18">
-          <input type="number" class="slider-val" id="peakChromaVal" min="0.05" max="0.38" step="0.005" value="0.18">
-        </div>
-        <div class="slider-row">
-          <span class="slider-label">Peak at L</span>
+          <span class="slider-label">Peak L</span>
           <input type="range" id="peakLSlider" min="0.2" max="0.8" step="0.01" value="0.55">
           <input type="number" class="slider-val" id="peakLVal" min="0.2" max="0.8" step="0.01" value="0.55">
+        </div>
+        <div class="slider-row">
+          <span class="slider-label">Peak C</span>
+          <input type="range" id="peakChromaSlider" min="0.05" max="0.38" step="0.005" value="0.18">
+          <input type="number" class="slider-val" id="peakChromaVal" min="0.05" max="0.38" step="0.005" value="0.18">
         </div>
         <div class="slider-row">
           <span class="slider-label">Peak Q</span>
@@ -1730,12 +1735,12 @@ function updateNodeTabValues() {
   const p = getParams();
   document.getElementById('tab-vals-0').textContent =
     `L ${p.curveDark.toFixed(2)}`;
-  document.getElementById('tab-vals-1').textContent =
-    `L ${p.lKneeL.toFixed(2)}  C ${p.lKneeC.toFixed(2)}`;
-  document.getElementById('tab-vals-2').textContent =
-    `C ${p.peakChroma.toFixed(2)}  L ${p.peakL.toFixed(2)}  Q ${p.peakQ.toFixed(1)}`;
-  document.getElementById('tab-vals-3').textContent =
-    `L ${p.rKneeL.toFixed(2)}  C ${p.rKneeC.toFixed(2)}`;
+  document.getElementById('tab-vals-1-l').textContent = `L ${p.lKneeL.toFixed(2)}`;
+  document.getElementById('tab-vals-1-c').textContent = `C ${p.lKneeC.toFixed(2)}`;
+  document.getElementById('tab-vals-2-l').textContent = `L ${p.peakL.toFixed(2)}`;
+  document.getElementById('tab-vals-2-c').textContent = `C ${p.peakChroma.toFixed(2)}`;
+  document.getElementById('tab-vals-3-l').textContent = `L ${p.rKneeL.toFixed(2)}`;
+  document.getElementById('tab-vals-3-c').textContent = `C ${p.rKneeC.toFixed(2)}`;
   document.getElementById('tab-vals-4').textContent =
     `L ${p.curveLight.toFixed(2)}`;
 }

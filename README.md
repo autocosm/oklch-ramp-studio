@@ -89,7 +89,7 @@ A full-width interactive editor that sits above the control panels and serves as
 |---|---|---|
 | **Dark** | `L` | Curve dark |
 | **L-Knee** | `L  C` | L-Knee L, L-Knee C |
-| **Peak** | `C  L  Q` | Chroma Peak, Peak at L, Peak Q |
+| **Peak** | `L  C` | Peak L, Peak C, Peak Q |
 | **R-Knee** | `L  C` | R-Knee L, R-Knee C |
 | **Light** | `L` | Curve light |
 
@@ -103,7 +103,7 @@ A full-width interactive editor that sits above the control panels and serves as
 | **Color space** | Controls which perceptual color model is used to convert L, C, h values into sRGB hex output. **OKLCH** (default) uses OKLab (Björn Ottosson, 2020). **SRLCH** uses SRLAB2 cylindrical coordinates (Jan Behrens, 2011), scaling L × 100 and C × 300 to SRLAB2 natural units. **CIELCH** uses CIE L\*C\*h° (CIELAB cylindrical), scaling identically. When SRLCH or CIELCH is active, the gamut ceiling overlay updates to reflect that space's sRGB boundary. See [OKLCH vs CIELCH vs SRLCH](#oklch-vs-cielch-vs-srlch) for guidance. |
 | **Out-of-gamut** | Controls how colors outside the sRGB triangle are handled. **SMART** binary-searches for the highest in-gamut chroma at the same L and h — hue and lightness fully preserved; recommended for design systems. **NAIVE** clips RGB channels directly — fast but colors shift in both hue and lightness. **COMP** applies per-channel ratio compression: excess chroma above the gamut ceiling is attenuated by the **Ratio** (1.5:1–20:1) rather than hard-cut, preserving more saturation intent with a small lightness drift. |
 
-The remaining chroma curve controls (**Chroma Peak**, **Peak at L**, **Peak Q**, **L-Knee L/C**, **R-Knee L/C**, **Curve dark**, **Curve light**) appear in the node tab row below the canvas — click the corresponding tab or canvas node to expand its controls.
+The remaining chroma curve controls (**Peak L**, **Peak C**, **Peak Q**, **L-Knee L/C**, **R-Knee L/C**, **Curve dark**, **Curve light**) appear in the node tab row below the canvas — click the corresponding tab or canvas node to expand its controls.
 
 ### Lightness Range & Steps
 
