@@ -1126,7 +1126,7 @@ function isInGamut(r, g, b, eps = 0.001) {
 
 function smartGamutMap(L, C, h, colorSpace) {
   let [r, g, b] = uiToLinearRGB(L, C, h, colorSpace);
-  if (isInGamut(r, g, b)) return { r, g, b, clipped: false };
+  if (isInGamut(r, g, b)) return { r, g, b, clipped: false, actualC: C };
   let lo = 0, hi = C, mid;
   for (let i = 0; i < 24; i++) {
     mid = (lo + hi) / 2;
@@ -1134,7 +1134,7 @@ function smartGamutMap(L, C, h, colorSpace) {
     isInGamut(r, g, b) ? (lo = mid) : (hi = mid);
   }
   [r, g, b] = uiToLinearRGB(L, lo, h, colorSpace);
-  return { r, g, b, clipped: true };
+  return { r, g, b, clipped: true, actualC: lo };
 }
 
 // WCAG 2.x relative luminance (IEC 61966-2-1 sRGB).
@@ -1197,22 +1197,22 @@ function compressGamutMap(L, C, h, ratio, colorSpace) {
   const maxC = findMaxChroma(L, h, colorSpace);
   if (C <= maxC) {
     const [r, g, b] = uiToLinearRGB(L, C, h, colorSpace);
-    return { r, g, b, clipped: false };
+    return { r, g, b, clipped: false, actualC: C };
   }
   // Apply ratio compression to the excess above the gamut ceiling
   const compressedC = maxC + (C - maxC) / ratio;
   const [r, g, b] = uiToLinearRGB(L, compressedC, h, colorSpace);
-  return { r, g, b, clipped: true };
+  return { r, g, b, clipped: true, actualC: compressedC };
 }
 
 function colorToHex(L, C, h, mode, ratio = 4, colorSpace = 'oklch') {
-  let r, g, b, clipped = false;
+  let r, g, b, clipped = false, actualC;
   if (mode === 'smart') {
-    ({ r, g, b, clipped } = smartGamutMap(L, C, h, colorSpace));
+    ({ r, g, b, clipped, actualC } = smartGamutMap(L, C, h, colorSpace));
   } else if (mode === 'compress') {
-    ({ r, g, b, clipped } = compressGamutMap(L, C, h, ratio, colorSpace));
+    ({ r, g, b, clipped, actualC } = compressGamutMap(L, C, h, ratio, colorSpace));
   } else {
-    // naive — raw channels, hard clamp
+    // naive — raw channels, hard clamp (no chroma-space compression)
     [r, g, b] = uiToLinearRGB(L, C, h, colorSpace);
     if (!isInGamut(r, g, b)) clipped = true;
   }
@@ -1220,7 +1220,7 @@ function colorToHex(L, C, h, mode, ratio = 4, colorSpace = 'oklch') {
   g = linearToSRGB(clamp01(g));
   b = linearToSRGB(clamp01(b));
   const toH = x => Math.round(clamp01(x) * 255).toString(16).padStart(2, '0');
-  return { hex: `#${toH(r)}${toH(g)}${toH(b)}`, clipped };
+  return { hex: `#${toH(r)}${toH(g)}${toH(b)}`, clipped, actualC };
 }
 
 function buildMonotoneCubicSpline(xs, ys) {
@@ -1422,9 +1422,9 @@ function generateRamp(p, overrideHue) {
     const L = p.rampLight - t * (p.rampLight - p.rampDark);
     const hueAtStep = baseHue + p.hueShift * (t - 0.5) * 2;
     const C = (L <= xs[0] || L >= xs[4]) ? 0 : p.sat * Math.max(0, spline(L));
-    const { hex, clipped } = colorToHex(L, C, hueAtStep, p.gamut, p.compRatio, p.colorSpace);
+    const { hex, clipped, actualC } = colorToHex(L, C, hueAtStep, p.gamut, p.compRatio, p.colorSpace);
     const stepKey = Math.round(tLinear * 900 + 50);
-    swatches.push({ L, C, h: hueAtStep, hex, clipped, step: stepKey, index: i });
+    swatches.push({ L, C, h: hueAtStep, hex, clipped, actualC, step: stepKey, index: i });
   }
   return swatches;
 }
@@ -1616,10 +1616,13 @@ function drawCurve(p) {
   // Step diamonds — subdued when any node is hovered or dragged
   const anyEngaged = curveEditor.dragNodeIdx !== null || curveEditor.hoverNodeIdx !== null;
   const swatches = window._swatches || [];
+
+  // Primary diamonds — plot at compressed chroma when clipped, otherwise at curve chroma
   ctx.save();
   ctx.globalAlpha = anyEngaged ? 0.2 : 1.0;
   swatches.forEach(s => {
-    const x = s.L * W, y = H - (s.C / maxC) * H;
+    const plotC = (s.clipped && s.actualC !== undefined) ? s.actualC : s.C;
+    const x = s.L * W, y = H - (plotC / maxC) * H;
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(Math.PI / 4);
