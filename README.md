@@ -16,6 +16,8 @@ okLCh Ramp Studio generates ramps where every stop is defined by:
 
 All output is converted to sRGB hex for direct use in CSS, design tools, or config files.
 
+![12-hue color system — RED through GRAY, 15 stops each](samples/okLCH_ramps.png)
+
 ---
 
 ## Usage
@@ -167,6 +169,10 @@ Disabled by default. When toggled **ON**, reveals a two-part interface for visua
 A full-width ramp grid rendered below the controls. Each row represents one ramp — the primary (marked with an accent border) appears first, followed by additional hues in card order. All rows share the same lightness range, step count, chroma curve, hue shift, and gamut mode as the primary, so every ramp is directly comparable on those axes; only the base hue differs.
 
 Column headers show step keys. Hover any swatch cell to see its hex value in a tooltip; click to copy it to the clipboard. Swatch cells do not expand on hover.
+
+The image above shows a 12-hue system (Red → Gray) as rendered by the Color System View. The saturation comparison below shows three saturation multiplier settings stacked per hue, illustrating how the **Saturation** slider scales the entire chroma curve up or down while keeping the curve shape intact:
+
+![Saturation comparison — three levels per hue across the full Color System View](samples/okLCH_saturations.png)
 
 ---
 
@@ -330,6 +336,14 @@ OKLab goes further — its linear transforms were fit empirically to perceptual 
 - Academic or research contexts where SRLAB2 is the reference standard.
 
 For most web and product design work, the differences between OKLCH and CIELCH are subtle in the midtones but clearly visible at high chroma, particularly for blues and warm yellows. SRLCH produces ramps noticeably better than CIELCH and comparable to OKLCH, with the most visible improvement in the blue and violet hue range. For production UI work, OKLCH remains the recommended default.
+
+The images below show full hue-spectrum matrices — every hue from 0° to 360° across the columns, ramp stops 50–950 down the rows — rendered first in **OKLCH** and then in **SRLCH**, each in dark and light mode:
+
+![Full hue-spectrum matrix — OKLCH, dark and light mode](samples/okLCh-2026-01.png)
+
+![Full hue-spectrum matrix with hex labels — OKLCH, dark and light mode](samples/okLCh-2026-02.png)
+
+![Full hue-spectrum matrix — SRLCH, dark and light mode](samples/srLCH-2026-03.png)
 
 ---
 
