@@ -83,15 +83,15 @@ A full-width interactive editor that sits above the control panels and serves as
 | **R-Knee** | Circle | L and C | Controls the descent from the peak toward the light anchor. Mirrors L-Knee on the light side. |
 | **Light** | Circle with vertical bar | L only | Sets the light anchor of the chroma spline. Horizontal drag only. |
 
-**Selecting nodes:** Click any node to select it. A contextual panel appears directly below the canvas showing precision slider and number controls for that node's parameters only. Click an empty area of the canvas to dismiss the panel. Drag interaction and selection work simultaneously — dragging a node also selects it.
+**Selecting nodes:** A persistent tab row sits directly below the canvas, always showing all five nodes and their current parameter values at a glance. Click any tab — or click the corresponding node on the canvas — to select it. The selected tab highlights with an accent underline and its precision slider controls expand below the tab row. Click an empty area of the canvas to deselect; the tab row remains visible with the values still readable. Drag interaction and selection work simultaneously — dragging a node also selects it and activates its tab.
 
-| Node selected | Controls shown |
-|---|---|
-| **Dark** | Curve dark |
-| **L-Knee** | L-Knee L, L-Knee C |
-| **Peak** | Chroma Peak, Peak at L, Peak Q |
-| **R-Knee** | R-Knee L, R-Knee C |
-| **Light** | Curve light |
+| Tab / Node | Values shown in tab | Controls shown when active |
+|---|---|---|
+| **Dark** | `L` | Curve dark |
+| **L-Knee** | `L  C` | L-Knee L, L-Knee C |
+| **Peak** | `C  L  Q` | Chroma Peak, Peak at L, Peak Q |
+| **R-Knee** | `L  C` | R-Knee L, R-Knee C |
+| **Light** | `L` | Curve light |
 
 ### Hue & Chroma
 
@@ -100,7 +100,7 @@ A full-width interactive editor that sits above the control panels and serves as
 | **Hue** | Base hue angle in degrees (0–360). The slider track renders a live perceptual hue gradient. |
 | **Saturation** | A multiplier applied to the entire chroma curve. 1.0 = curve as-is; values below 1 produce more neutral/muted ramps; values above 1 push toward maximum chroma. |
 
-The remaining chroma curve controls (**Chroma Peak**, **Peak at L**, **Peak Q**, **L-Knee L/C**, **R-Knee L/C**, **Curve dark**, **Curve light**) appear in the node panel when the corresponding canvas node is selected — see above.
+The remaining chroma curve controls (**Chroma Peak**, **Peak at L**, **Peak Q**, **L-Knee L/C**, **R-Knee L/C**, **Curve dark**, **Curve light**) appear in the node tab row below the canvas — click the corresponding tab or canvas node to expand its controls.
 
 ### Lightness Range & Steps
 

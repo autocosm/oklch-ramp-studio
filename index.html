@@ -418,11 +418,57 @@
   /* ── NODE CONTROL PANEL ── */
   #node-panel {
     grid-column: 1 / -1;
+  }
+  #node-controls-body {
     padding: 12px 20px 18px;
     border-bottom: 1px solid var(--border);
   }
+  #node-controls-body[hidden] { display: none; }
 
   .node-controls[hidden] { display: none; }
+
+  /* ── NODE TAB ROW ── */
+  #node-tab-row {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  #node-tab-row::-webkit-scrollbar { display: none; }
+
+  .node-tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 9px 14px 7px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+    white-space: nowrap;
+    flex-shrink: 0;
+    user-select: none;
+  }
+  .node-tab:hover { color: var(--text); background: var(--surface2); }
+  .node-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    background: var(--surface2);
+  }
+  .node-tab-label {
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+  }
+  .node-tab-vals {
+    font-size: 9px;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+  }
+  .node-tab.active .node-tab-vals { color: var(--accent); opacity: 0.7; }
 
   /* ── SCROLLBAR ── */
   ::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -745,68 +791,94 @@
     <canvas id="curve-canvas"></canvas>
   </div>
 
-  <!-- Node control panel — appears when a curve node is selected -->
-  <div id="node-panel" hidden>
-    <div class="panel-title" id="node-panel-title">// Peak</div>
+  <!-- Node control panel — tab row always visible; controls body shown when a tab is selected -->
+  <div id="node-panel">
 
-    <div class="node-controls" data-node="0" hidden>
-      <div class="slider-row">
-        <span class="slider-label">Curve dark</span>
-        <input type="range" id="curveDarkSlider" min="0.01" max="0.35" step="0.005" value="0.12">
-        <input type="number" class="slider-val" id="curveDarkVal" min="0.01" max="0.35" step="0.005" value="0.12">
+    <div id="node-tab-row">
+      <div class="node-tab" data-node-tab="0" onclick="selectNodeTab(0)">
+        <span class="node-tab-label">Dark</span>
+        <span class="node-tab-vals" id="tab-vals-0">L —</span>
+      </div>
+      <div class="node-tab" data-node-tab="1" onclick="selectNodeTab(1)">
+        <span class="node-tab-label">L-Knee</span>
+        <span class="node-tab-vals" id="tab-vals-1">L —  C —</span>
+      </div>
+      <div class="node-tab" data-node-tab="2" onclick="selectNodeTab(2)">
+        <span class="node-tab-label">Peak</span>
+        <span class="node-tab-vals" id="tab-vals-2">C —  L —  Q —</span>
+      </div>
+      <div class="node-tab" data-node-tab="3" onclick="selectNodeTab(3)">
+        <span class="node-tab-label">R-Knee</span>
+        <span class="node-tab-vals" id="tab-vals-3">L —  C —</span>
+      </div>
+      <div class="node-tab" data-node-tab="4" onclick="selectNodeTab(4)">
+        <span class="node-tab-label">Light</span>
+        <span class="node-tab-vals" id="tab-vals-4">L —</span>
       </div>
     </div>
 
-    <div class="node-controls" data-node="1" hidden>
-      <div class="slider-row">
-        <span class="slider-label">L-Knee L</span>
-        <input type="range" id="lKneeLSlider" min="0.05" max="0.7" step="0.01" value="0.25">
-        <input type="number" class="slider-val" id="lKneeLVal" min="0.05" max="0.7" step="0.01" value="0.25">
-      </div>
-      <div class="slider-row">
-        <span class="slider-label">L-Knee C</span>
-        <input type="range" id="lKneeCSlider" min="0" max="0.38" step="0.005" value="0.12">
-        <input type="number" class="slider-val" id="lKneeCVal" min="0" max="0.38" step="0.005" value="0.12">
-      </div>
-    </div>
+    <div id="node-controls-body" hidden>
 
-    <div class="node-controls" data-node="2" hidden>
-      <div class="slider-row">
-        <span class="slider-label">Chroma Peak</span>
-        <input type="range" id="peakChromaSlider" min="0.05" max="0.38" step="0.005" value="0.18">
-        <input type="number" class="slider-val" id="peakChromaVal" min="0.05" max="0.38" step="0.005" value="0.18">
+      <div class="node-controls" data-node="0" hidden>
+        <div class="slider-row">
+          <span class="slider-label">Curve dark</span>
+          <input type="range" id="curveDarkSlider" min="0.01" max="0.35" step="0.005" value="0.12">
+          <input type="number" class="slider-val" id="curveDarkVal" min="0.01" max="0.35" step="0.005" value="0.12">
+        </div>
       </div>
-      <div class="slider-row">
-        <span class="slider-label">Peak at L</span>
-        <input type="range" id="peakLSlider" min="0.2" max="0.8" step="0.01" value="0.55">
-        <input type="number" class="slider-val" id="peakLVal" min="0.2" max="0.8" step="0.01" value="0.55">
-      </div>
-      <div class="slider-row">
-        <span class="slider-label">Peak Q</span>
-        <input type="range" id="peakQSlider" min="0.5" max="4" step="0.05" value="1">
-        <input type="number" class="slider-val" id="peakQVal" min="0.5" max="4" step="0.05" value="1">
-      </div>
-    </div>
 
-    <div class="node-controls" data-node="3" hidden>
-      <div class="slider-row">
-        <span class="slider-label">R-Knee L</span>
-        <input type="range" id="rKneeLSlider" min="0.3" max="0.98" step="0.01" value="0.80">
-        <input type="number" class="slider-val" id="rKneeLVal" min="0.3" max="0.98" step="0.01" value="0.80">
+      <div class="node-controls" data-node="1" hidden>
+        <div class="slider-row">
+          <span class="slider-label">L-Knee L</span>
+          <input type="range" id="lKneeLSlider" min="0.05" max="0.7" step="0.01" value="0.25">
+          <input type="number" class="slider-val" id="lKneeLVal" min="0.05" max="0.7" step="0.01" value="0.25">
+        </div>
+        <div class="slider-row">
+          <span class="slider-label">L-Knee C</span>
+          <input type="range" id="lKneeCSlider" min="0" max="0.38" step="0.005" value="0.12">
+          <input type="number" class="slider-val" id="lKneeCVal" min="0" max="0.38" step="0.005" value="0.12">
+        </div>
       </div>
-      <div class="slider-row">
-        <span class="slider-label">R-Knee C</span>
-        <input type="range" id="rKneeCSlider" min="0" max="0.38" step="0.005" value="0.12">
-        <input type="number" class="slider-val" id="rKneeCVal" min="0" max="0.38" step="0.005" value="0.12">
-      </div>
-    </div>
 
-    <div class="node-controls" data-node="4" hidden>
-      <div class="slider-row">
-        <span class="slider-label">Curve light</span>
-        <input type="range" id="curveLightSlider" min="0.75" max="0.99" step="0.005" value="0.97">
-        <input type="number" class="slider-val" id="curveLightVal" min="0.75" max="0.99" step="0.005" value="0.97">
+      <div class="node-controls" data-node="2" hidden>
+        <div class="slider-row">
+          <span class="slider-label">Chroma Peak</span>
+          <input type="range" id="peakChromaSlider" min="0.05" max="0.38" step="0.005" value="0.18">
+          <input type="number" class="slider-val" id="peakChromaVal" min="0.05" max="0.38" step="0.005" value="0.18">
+        </div>
+        <div class="slider-row">
+          <span class="slider-label">Peak at L</span>
+          <input type="range" id="peakLSlider" min="0.2" max="0.8" step="0.01" value="0.55">
+          <input type="number" class="slider-val" id="peakLVal" min="0.2" max="0.8" step="0.01" value="0.55">
+        </div>
+        <div class="slider-row">
+          <span class="slider-label">Peak Q</span>
+          <input type="range" id="peakQSlider" min="0.5" max="4" step="0.05" value="1">
+          <input type="number" class="slider-val" id="peakQVal" min="0.5" max="4" step="0.05" value="1">
+        </div>
       </div>
+
+      <div class="node-controls" data-node="3" hidden>
+        <div class="slider-row">
+          <span class="slider-label">R-Knee L</span>
+          <input type="range" id="rKneeLSlider" min="0.3" max="0.98" step="0.01" value="0.80">
+          <input type="number" class="slider-val" id="rKneeLVal" min="0.3" max="0.98" step="0.01" value="0.80">
+        </div>
+        <div class="slider-row">
+          <span class="slider-label">R-Knee C</span>
+          <input type="range" id="rKneeCSlider" min="0" max="0.38" step="0.005" value="0.12">
+          <input type="number" class="slider-val" id="rKneeCVal" min="0" max="0.38" step="0.005" value="0.12">
+        </div>
+      </div>
+
+      <div class="node-controls" data-node="4" hidden>
+        <div class="slider-row">
+          <span class="slider-label">Curve light</span>
+          <input type="range" id="curveLightSlider" min="0.75" max="0.99" step="0.005" value="0.97">
+          <input type="number" class="slider-val" id="curveLightVal" min="0.75" max="0.99" step="0.005" value="0.97">
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -1438,6 +1510,7 @@ function render() {
 
   window._swatches = swatches;
   window._params = p;
+  updateNodeTabValues();
 }
 
 /* ════════════════════════════════════
@@ -1660,22 +1733,43 @@ function drawCurve(p) {
    ════════════════════════════════════ */
 
 function updateNodePanel() {
-  const panel = document.getElementById('node-panel');
-  const title = document.getElementById('node-panel-title');
+  const body = document.getElementById('node-controls-body');
   const idx = curveEditor.selectedNodeIdx;
-  const nodeLabels = ['// Dark', '// L-Knee', '// Peak', '// R-Knee', '// Light'];
 
   document.querySelectorAll('.node-controls').forEach(g => { g.hidden = true; });
+  document.querySelectorAll('.node-tab').forEach(t => t.classList.remove('active'));
 
   if (idx === null) {
-    panel.hidden = true;
+    body.hidden = true;
     return;
   }
 
-  panel.hidden = false;
-  title.textContent = nodeLabels[idx];
-  const group = panel.querySelector(`.node-controls[data-node="${idx}"]`);
+  body.hidden = false;
+  const group = body.querySelector(`.node-controls[data-node="${idx}"]`);
   if (group) group.hidden = false;
+
+  const tab = document.querySelector(`.node-tab[data-node-tab="${idx}"]`);
+  if (tab) tab.classList.add('active');
+}
+
+function selectNodeTab(idx) {
+  curveEditor.selectedNodeIdx = idx;
+  updateNodePanel();
+  render();
+}
+
+function updateNodeTabValues() {
+  const p = getParams();
+  document.getElementById('tab-vals-0').textContent =
+    `L ${p.curveDark.toFixed(2)}`;
+  document.getElementById('tab-vals-1').textContent =
+    `L ${p.lKneeL.toFixed(2)}  C ${p.lKneeC.toFixed(2)}`;
+  document.getElementById('tab-vals-2').textContent =
+    `C ${p.peakChroma.toFixed(2)}  L ${p.peakL.toFixed(2)}  Q ${p.peakQ.toFixed(1)}`;
+  document.getElementById('tab-vals-3').textContent =
+    `L ${p.rKneeL.toFixed(2)}  C ${p.rKneeC.toFixed(2)}`;
+  document.getElementById('tab-vals-4').textContent =
+    `L ${p.curveLight.toFixed(2)}`;
 }
 
 /* ════════════════════════════════════
