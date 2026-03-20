@@ -897,7 +897,7 @@
 
     <div class="toggle-row" style="margin-top:10px;">
       <div>
-        <span class="toggle-label">Smoothing</span>
+        <span class="toggle-label">Soft Knee</span>
       </div>
       <div class="toggle-btn">
         <div class="toggle-opt" id="opt-smooth-yes" onclick="setSmooth(true)">YES</div>
@@ -1530,22 +1530,53 @@ function generateRamp(p, overrideHue) {
     swatches.push({ L, C, h: hueAtStep, hex, clipped, actualC, step: stepKey, index: i });
   }
 
-  // Apex smoothing: set the highest post-gamut chroma step to the average of its neighbors
+  // Knee-aware smoothing: soften the hard knee where the chroma ceiling meets the curve
   if (p.smooth && swatches.length >= 3) {
+    const n = swatches.length;
     const plotC = s => (s.clipped && s.actualC !== undefined) ? s.actualC : s.C;
-    let apexIdx = 0;
-    for (let i = 1; i < swatches.length; i++) {
-      if (plotC(swatches[i]) > plotC(swatches[apexIdx])) apexIdx = i;
+    const values = swatches.map(plotC);
+
+    // Mark stops at or adjacent to the clipping boundary (the "knee region")
+    const inKneeRegion = new Array(n).fill(false);
+    for (let i = 0; i < n; i++) {
+      const clip  = swatches[i].clipped;
+      const prevC = i > 0     && swatches[i - 1].clipped;
+      const nextC = i < n - 1 && swatches[i + 1].clipped;
+      if (clip !== prevC || clip !== nextC) {
+        // Knee boundary — also pull in direct neighbors for a wider blend
+        if (i > 0)     inKneeRegion[i - 1] = true;
+                       inKneeRegion[i]     = true;
+        if (i < n - 1) inKneeRegion[i + 1] = true;
+      }
     }
-    if (apexIdx > 0 && apexIdx < swatches.length - 1) {
-      const apex = swatches[apexIdx];
-      const avgNeighborC = (plotC(swatches[apexIdx - 1]) + plotC(swatches[apexIdx + 1])) / 2;
-      const smoothedC = (plotC(apex) + avgNeighborC) / 2;
-      const { hex, clipped, actualC } = colorToHex(apex.L, smoothedC, apex.h, p.gamut, p.compRatio, p.colorSpace);
-      apex.hex = hex;
-      apex.clipped = clipped;
-      apex.actualC = actualC;
-      apex.C = smoothedC;
+
+    // Fallback: if nothing is clipped, smooth the global apex (original behavior)
+    if (!swatches.some(s => s.clipped)) {
+      let apexIdx = 0;
+      for (let i = 1; i < n; i++) {
+        if (values[i] > values[apexIdx]) apexIdx = i;
+      }
+      if (apexIdx > 0 && apexIdx < n - 1) inKneeRegion[apexIdx] = true;
+    }
+
+    // Apply weighted [0.25, 0.5, 0.25] kernel to knee-region stops (single pass, using original values)
+    const smoothed = [...values];
+    for (let i = 1; i < n - 1; i++) {
+      if (inKneeRegion[i]) {
+        smoothed[i] = 0.25 * values[i - 1] + 0.5 * values[i] + 0.25 * values[i + 1];
+      }
+    }
+
+    // Re-render any stop whose chroma changed
+    for (let i = 0; i < n; i++) {
+      if (Math.abs(smoothed[i] - values[i]) > 1e-9) {
+        const s = swatches[i];
+        const { hex, clipped, actualC } = colorToHex(s.L, smoothed[i], s.h, p.gamut, p.compRatio, p.colorSpace);
+        s.hex = hex;
+        s.clipped = clipped;
+        s.actualC = actualC;
+        s.C = smoothed[i];
+      }
     }
   }
 
