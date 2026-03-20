@@ -112,11 +112,11 @@ The remaining chroma curve controls (**Peak L**, **Peak C**, **Peak Q**, **L-Kne
 |---|---|
 | **Ramp light** | Lightness of the lightest stop (step 50). Default 0.97 ≈ near-white. Independent of the chroma curve's light anchor — steps that fall outside the curve anchor range simply receive zero chroma. |
 | **Ramp dark** | Lightness of the darkest stop (step 950). Default 0.12 ≈ very dark. Independent of the chroma curve's dark anchor. |
-| **Steps** | Number of stops in the ramp. Odd values only (3–21). Stop keys are distributed evenly across a 50–950 scale (e.g. 11 steps → 50, 140, 230 … 950). |
+| **Steps** | Number of stops in the ramp. Odd values only (3–23). Stop keys are distributed evenly across a 50–950 scale (e.g. 11 steps → 50, 140, 230 … 950). |
 
 ### L Spacing
 
-Controls how lightness values are distributed across the ramp. All four modes anchor the lightest and darkest stops at the same L values — only the placement of the intermediate stops changes.
+Controls how lightness values are distributed across the ramp. The first four modes anchor the lightest and darkest stops at the same L values — only the placement of the intermediate stops changes. PRISM is a fixed-scale mode that overrides those anchors entirely.
 
 | Mode | Behavior |
 |---|---|
@@ -124,8 +124,26 @@ Controls how lightness values are distributed across the ramp. All four modes an
 | **PARABOLIC** | Steps concentrate near the lightest and darkest extremes, with wider gaps in the midtones. Implemented as a blended cosine ease-in/out (`75% cosine + 25% linear`). Because chroma peaks in the midtones, this places fewer stops where chroma variation is highest and more stops near the neutral extremes — useful when you need fine-grained light and dark shades for surfaces and text while accepting coarser midtone resolution. |
 | **ADJUSTED** | Applies a gamma-like correction (`t^0.77`) derived from the Munsell value scale, which models perceived equal lightness steps in human vision. The result compresses the dark end slightly relative to the light end, producing stops that feel more equidistant when viewed. Recommended when perceptual uniformity matters most — for example, accessible neutral ramps or UI grays where banding is noticeable. |
 | **ARC** | Divides the chroma curve into equal arc-length intervals, measuring distance as Euclidean in (L, C) space so that both lightness change and chroma change count toward the spacing. Stops are pulled toward regions of the curve that are steep in chroma (near the peak) and spread apart where the curve is flat (near the neutral extremes). Produces a ramp where each visual step feels like an equal-sized move along the shape of the curve itself. |
+| **PRISM** | Uses the PrismColor fixed 23-stop weight scale, where each stop corresponds to a predetermined CIE L\* value. Stop keys use the PrismColor weight convention (0, 25, 50 … 999) rather than the default 50–950 scale. Activating this mode locks Steps to 23 and sets Ramp dark, Ramp light, Curve dark, and Curve light to their full 0–1 range — those controls are disabled while PRISM is active. Switching to any other mode restores all previously set values. See [PrismColor weight scale](#prismcolor-weight-scale) below. |
 
 The canvas updates in real time to show diamond positions for the active spacing mode.
+
+#### PrismColor weight scale
+
+PrismColor uses a **000–999 weight scale** with 23 discrete stops mapped linearly to CIE L\* values (0–100). The weight formula is `weight = (100 − L*) × 10`, so weight 000 = pure white (L\* 100) and weight 999 = pure black (L\* 0). Weight 500 is nudged from L\* 50 to L\* 49.75 so the swatch reliably passes WCAG 2.1 4.5:1 contrast against white.
+
+| Weight | L\* | Weight | L\* | Weight | L\* |
+|---|---|---|---|---|---|
+| **000** | 100 | **300** | 70 | **650** | 35 |
+| **025** | 97.5 | **350** | 65 | **700** | 30 |
+| **050** | 95 | **400** | 60 | **750** | 25 |
+| **075** | 92.5 | **450** | 55 | **800** | 20 |
+| **100** | 90 | **500** | ~49.75 | **850** | 15 |
+| **150** | 85 | **550** | 45 | **900** | 10 |
+| **200** | 80 | **600** | 40 | **950** | 5 |
+| **250** | 75 | | | **999** | 0 |
+
+The first five stops use 2.5 L\* increments; the remainder use 5 L\* increments. Weight consistency is cross-hue: a weight-500 blue and a weight-500 red always share the same perceptual lightness (~L\* 50), which is the key differentiator from HSL/HSB-based tools.
 
 ### Gamut Handling
 

@@ -334,6 +334,8 @@
 
   .toggle-opt.active { background: var(--accent2); color: white; }
 
+  input:disabled { opacity: 0.38; pointer-events: none; }
+
   /* ── GAMUT CHIPS ── */
 
 
@@ -953,8 +955,8 @@
 
     <div class="slider-row">
       <span class="slider-label">Steps</span>
-      <input type="range" id="stepsSlider" min="3" max="21" step="2" value="11">
-      <input type="number" class="slider-val" id="stepsVal" min="3" max="21" step="2" value="11">
+      <input type="range" id="stepsSlider" min="3" max="23" step="2" value="11">
+      <input type="number" class="slider-val" id="stepsVal" min="3" max="23" step="2" value="11">
     </div>
 
     <div class="toggle-row" style="margin-top:10px;">
@@ -966,6 +968,7 @@
         <div class="toggle-opt"        id="opt-lsp-para"     onclick="setLSpacing('parabolic')">PARA</div>
         <div class="toggle-opt"        id="opt-lsp-adjusted" onclick="setLSpacing('adjusted')">ADJ</div>
         <div class="toggle-opt"        id="opt-lsp-arc"      onclick="setLSpacing('arc')">ARC</div>
+        <div class="toggle-opt"        id="opt-lsp-prism"    onclick="setLSpacing('prismcolor')">PRISM</div>
       </div>
     </div>
 
@@ -1348,6 +1351,7 @@ const curveEditor = {
 };
 
 function getParams() {
+  const isPrism = state.lSpacing === 'prismcolor';
   return {
     hue:        +document.getElementById('hueSlider').value,
     sat:        +document.getElementById('satSlider').value,
@@ -1357,12 +1361,12 @@ function getParams() {
     lKneeC:     +document.getElementById('lKneeCSlider').value,
     rKneeL:     +document.getElementById('rKneeLSlider').value,
     rKneeC:     +document.getElementById('rKneeCSlider').value,
-    curveLight: +document.getElementById('curveLightSlider').value,
-    curveDark:  +document.getElementById('curveDarkSlider').value,
+    curveLight: isPrism ? 1.0 : +document.getElementById('curveLightSlider').value,
+    curveDark:  isPrism ? 0.0 : +document.getElementById('curveDarkSlider').value,
     peakQ:      +document.getElementById('peakQSlider').value,
-    rampLight:  +document.getElementById('lightEndSlider').value,
-    rampDark:   +document.getElementById('darkEndSlider').value,
-    steps:      +document.getElementById('stepsSlider').value,
+    rampLight:  isPrism ? 1.0 : +document.getElementById('lightEndSlider').value,
+    rampDark:   isPrism ? 0.0 : +document.getElementById('darkEndSlider').value,
+    steps:      isPrism ? 23  : +document.getElementById('stepsSlider').value,
     hueShift:   +document.getElementById('hueShiftSlider').value,
     smooth:     state.smooth,
     gamut:      state.gamut,
@@ -1376,12 +1380,51 @@ function getParams() {
    L SPACING
    ════════════════════════════════════ */
 
+// Saved values for controls locked while PrismColor spacing is active.
+let prismSnapshot = null;
+
 function setLSpacing(mode) {
+  const lockIds = ['stepsSlider', 'stepsVal',
+                   'lightEndSlider', 'lightEndVal',
+                   'darkEndSlider', 'darkEndVal',
+                   'curveLightSlider', 'curveLightVal',
+                   'curveDarkSlider', 'curveDarkVal'];
+  const prism = mode === 'prismcolor';
+  const wasPrism = state.lSpacing === 'prismcolor';
+
+  if (prism && !wasPrism) {
+    // Snapshot current values before locking
+    prismSnapshot = {};
+    for (const id of lockIds) prismSnapshot[id] = document.getElementById(id).value;
+  }
+
   state.lSpacing = mode;
-  document.getElementById('opt-lsp-linear').classList.toggle('active', mode === 'linear');
-  document.getElementById('opt-lsp-para').classList.toggle('active', mode === 'parabolic');
+  document.getElementById('opt-lsp-linear').classList.toggle('active',   mode === 'linear');
+  document.getElementById('opt-lsp-para').classList.toggle('active',     mode === 'parabolic');
   document.getElementById('opt-lsp-adjusted').classList.toggle('active', mode === 'adjusted');
-  document.getElementById('opt-lsp-arc').classList.toggle('active', mode === 'arc');
+  document.getElementById('opt-lsp-arc').classList.toggle('active',      mode === 'arc');
+  document.getElementById('opt-lsp-prism').classList.toggle('active',    mode === 'prismcolor');
+
+  if (prism) {
+    const prismVals = { stepsSlider: 23, stepsVal: 23,
+                        lightEndSlider: 1.0, lightEndVal: 1.0,
+                        darkEndSlider: 0.0, darkEndVal: 0.0,
+                        curveLightSlider: 1.0, curveLightVal: 1.0,
+                        curveDarkSlider: 0.0, curveDarkVal: 0.0 };
+    for (const id of lockIds) {
+      const el = document.getElementById(id);
+      el.value = prismVals[id];
+      el.disabled = true;
+    }
+  } else {
+    // Restore snapshot if returning from prism, otherwise just re-enable
+    for (const id of lockIds) {
+      const el = document.getElementById(id);
+      el.disabled = false;
+      if (wasPrism && prismSnapshot) el.value = prismSnapshot[id];
+    }
+    if (wasPrism) prismSnapshot = null;
+  }
   render();
 }
 
@@ -1394,6 +1437,14 @@ function setContrastMode(mode) {
   document.body.classList.toggle('apca-mode', mode === 'apca');
   render();
 }
+
+// PrismColor fixed 23-stop L* scale.  weight = (100 − L*) × 10;
+// weight 500 nudged to L*=49.75 for WCAG 4.5:1 against white; weight 999 = pure black.
+const PRISM_KEYS = [0, 25, 50, 75, 100, 150, 200, 250, 300, 350, 400, 450,
+                    500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 999];
+const PRISM_L    = [1.0, 0.975, 0.95, 0.925, 0.90, 0.85, 0.80, 0.75, 0.70,
+                    0.65, 0.60, 0.55, 0.4975, 0.45, 0.40, 0.35, 0.30, 0.25,
+                    0.20, 0.15, 0.10, 0.05, 0.0];
 
 // Maps linear t ∈ [0,1] to a redistributed t based on spacing mode.
 // t=0 → light end, t=1 → dark end.
@@ -1466,15 +1517,16 @@ function generateRamp(p, overrideHue) {
     };
   }
 
+  const isPrism = (p.lSpacing || 'linear') === 'prismcolor';
   const swatches = [];
   for (let i = 0; i < p.steps; i++) {
     const tLinear = i / (p.steps - 1);
     const t = arcRemap ? arcRemap(tLinear) : remapT(tLinear, p.lSpacing || 'linear');
-    const L = p.rampLight - t * (p.rampLight - p.rampDark);
+    const L = isPrism ? PRISM_L[i] : p.rampLight - t * (p.rampLight - p.rampDark);
     const hueAtStep = baseHue + p.hueShift * (t - 0.5) * 2;
     const C = (L <= xs[0] || L >= xs[4]) ? 0 : p.sat * Math.max(0, spline(L));
     const { hex, clipped, actualC } = colorToHex(L, C, hueAtStep, p.gamut, p.compRatio, p.colorSpace);
-    const stepKey = Math.round(tLinear * 900 + 50);
+    const stepKey = isPrism ? PRISM_KEYS[i] : Math.round(tLinear * 900 + 50);
     swatches.push({ L, C, h: hueAtStep, hex, clipped, actualC, step: stepKey, index: i });
   }
 
