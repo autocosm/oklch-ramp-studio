@@ -62,6 +62,7 @@ function srlchToLinearRGB(L, C, h) {
 const CIELCH_L_SCALE   = 100, CIELCH_C_SCALE   = 300;
 const CIELCHUV_L_SCALE = 100, CIELCHUV_C_SCALE = 300;
 const SRLCH_L_SCALE    = 100, SRLCH_C_SCALE    = 300;
+const JZCZHZ_L_SCALE   = 1,   JZCZHZ_C_SCALE   = 0.5;
 
 // CIELChUV (cylindrical CIELUV) → linear sRGB.  L in [0,100], C in [0,~170], h in degrees.
 function cielchuvToLinearRGB(L, C, h) {
@@ -85,10 +86,46 @@ function cielchuvToLinearRGB(L, C, h) {
   ];
 }
 
+// JzCzHz (cylindrical JzAzBz, Safdar 2017) → linear sRGB.
+// Jz in [0, ~1] (D65 white ≈ 0.9999 at 203 cd/m²), Cz in [0, ~0.22], h in degrees.
+function jzczhzToLinearRGB(Jz, Cz, h) {
+  if (Jz <= 0) return [0, 0, 0];
+  const hr = h * Math.PI / 180;
+  const az = Cz * Math.cos(hr);
+  const bz = Cz * Math.sin(hr);
+  // Jz → Iz
+  const d = -0.56, d0 = 1.6295499532821566e-11;
+  const Iz = (Jz + d0) / (1 + d - d * (Jz + d0));
+  // Iz,az,bz → L',M',S' (inverse M2, Safdar 2017)
+  const Lp = Iz + 0.138605043271539 * az + 0.058047316156119 * bz;
+  const Mp = Iz - 0.138605043271539 * az - 0.058047316156119 * bz;
+  const Sp = Iz - 0.096019242067827 * az - 0.811891896056039 * bz;
+  // Inverse PQ (ST 2084) → absolute LMS (cd/m²)
+  const n = 0.15930175896, m = 78.84375;
+  const c1 = 0.8359375, c2 = 18.8515625, c3 = 18.6875;
+  const invPQ = x => {
+    const xm = Math.pow(Math.max(x, 0), 1 / m);
+    return 203 * Math.pow(Math.max(xm - c1, 0) / (c2 - c3 * xm), 1 / n);
+  };
+  const l = invPQ(Lp), ms = invPQ(Mp), s = invPQ(Sp);
+  // Absolute LMS → absolute XYZ D65 (inverse M1, Safdar 2017)
+  const X =  1.9242264357876067 * l - 1.0047923125953657 * ms + 0.037651404030618  * s;
+  const Y =  0.3503167620949991 * l + 0.7264811939316552 * ms - 0.065384422948085  * s;
+  const Z = -0.0909828109828475 * l - 0.3127282905230739 * ms + 1.5227665613052603 * s;
+  // Absolute XYZ → relative XYZ (÷203), then D65 → linear sRGB
+  const Xr = X / 203, Yr = Y / 203, Zr = Z / 203;
+  return [
+    +3.2404542 * Xr - 1.5371385 * Yr - 0.4985314 * Zr,
+    -0.9692660 * Xr + 1.8760108 * Yr + 0.0415560 * Zr,
+    +0.0556434 * Xr - 0.2040259 * Yr + 1.0572252 * Zr
+  ];
+}
+
 function uiToLinearRGB(L, C, h, colorSpace) {
   if (colorSpace === 'cielch')   return cielchToLinearRGB(L * CIELCH_L_SCALE,     C * CIELCH_C_SCALE,   h);
   if (colorSpace === 'cielchuv') return cielchuvToLinearRGB(L * CIELCHUV_L_SCALE, C * CIELCHUV_C_SCALE, h);
   if (colorSpace === 'srlch')    return srlchToLinearRGB(L * SRLCH_L_SCALE,       C * SRLCH_C_SCALE,    h);
+  if (colorSpace === 'jzczhz')   return jzczhzToLinearRGB(L * JZCZHZ_L_SCALE,     C * JZCZHZ_C_SCALE,   h);
   return oklchToLinearRGB(L, C, h);
 }
 
@@ -252,7 +289,7 @@ function parseArgs(argv) {
     gamut:      get('--gamut', 'smart'),       // smart | naive | compress
     compRatio:  parseFloat(get('--compRatio', '4')),
     lSpacing:   get('--spacing', 'linear'),    // linear | parabolic | adjusted
-    colorSpace: get('--colorSpace', 'oklch'), // oklch | cielch | cielchuv | srlch
+    colorSpace: get('--colorSpace', 'oklch'), // oklch | cielch | cielchuv | srlch | jzczhz
     format:     get('--format', 'css'),        // css | json | scss | tailwind | hex
     name:       get('--name', 'color'),
   };
