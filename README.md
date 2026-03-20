@@ -147,15 +147,15 @@ The first five stops use 2.5 L\* increments; the remainder use 5 L\* increments.
 
 ### Gamut Handling
 
-okLCh can describe colors that lie outside the sRGB triangle. The gamut toggle offers three modes:
+okLCh can describe colors that lie outside the sRGB triangle. The **Out-of-gamut** slider selects how out-of-gamut colors are handled, with 15 enumerated steps:
 
-| Mode | Behavior |
+| Step | Behavior |
 |---|---|
-| **SMART** | Binary-searches for the highest chroma value at the same L and h that still fits in sRGB. Hue and lightness are fully preserved. Recommended for design systems requiring clean, predictable output. |
-| **NAIVE** | Clips RGB channels directly after conversion. Fast and simple, but out-of-gamut colors will shift in both hue and lightness. Useful for seeing how much of a ramp is theoretically outside sRGB. |
-| **COMP** | Chroma-space ratio compression. For each step, the maximum in-gamut chroma at that exact L and h is found via binary search. If the requested chroma exceeds this ceiling, the excess is retained but attenuated by the compression ratio rather than hard-cut. Because hue is never touched, the result preserves more of the original saturation intent while introducing only a small lightness drift — and because the gamut ceiling varies by hue angle, the effect is uneven across the ramp, producing character that changes as you move the Hue slider. |
+| **OFF** | Clips RGB channels directly after conversion. Fast and simple, but out-of-gamut colors will shift in both hue and lightness. Useful for seeing how much of a ramp is theoretically outside sRGB. |
+| **1.25:1 – 20:1** | Chroma-space ratio compression. For each step, the maximum in-gamut chroma at that exact L and h is found via binary search. If the requested chroma exceeds this ceiling, the excess is retained but attenuated by the compression ratio rather than hard-cut. Because hue is never touched, the result preserves more of the original saturation intent while introducing only a small lightness drift — and because the gamut ceiling varies by hue angle, the effect is uneven across the ramp, producing character that changes as you move the Hue slider. Low ratios like 1.25:1–2:1 retain most of the excess (more character, more drift); high ratios like 15:1–20:1 approach hard-clip behavior. The 3:1–6.5:1 range tends to be most useful. |
+| **INF** | Binary-searches for the highest chroma value at the same L and h that still fits in sRGB. Hue and lightness are fully preserved. Recommended for design systems requiring clean, predictable output. |
 
-**Ratio** (COMP mode only, 1.5:1 to 20:1): Controls how aggressively excess chroma is attenuated. Low ratios like 2:1 retain most of the excess — more character, more drift. High ratios like 16:1 approach hard-clip behavior, converging toward NAIVE. The 3:1–6:1 range tends to be most useful.
+The full step sequence is: OFF, 1.25:1, 1.5:1, 2:1, 2.5:1, 3:1, 4:1, 5:1, 6.5:1, 8:1, 10:1, 12:1, 15:1, 20:1, INF.
 
 ### Color System View
 

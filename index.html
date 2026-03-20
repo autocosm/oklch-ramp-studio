@@ -918,21 +918,10 @@
       </div>
     </div>
 
-    <div class="toggle-row" style="margin-top:10px;">
-      <div>
-        <span class="toggle-label">Out-of-gamut</span>
-      </div>
-      <div class="toggle-btn">
-        <div class="toggle-opt active" id="opt-smart"    onclick="setGamut('smart')">SMART</div>
-        <div class="toggle-opt"        id="opt-naive"    onclick="setGamut('naive')">NAIVE</div>
-        <div class="toggle-opt"        id="opt-compress" onclick="setGamut('compress')">COMP</div>
-      </div>
-    </div>
-    <!-- Ratio slider — only visible in COMP mode -->
-    <div class="slider-row" id="comp-ratio-row" style="display:none;margin-top:10px;">
-      <span class="slider-label">Ratio</span>
-      <input type="range" id="compRatioSlider" min="1.5" max="20" step="0.5" value="4">
-      <input type="number" class="slider-val" id="compRatioVal" min="1.5" max="20" step="0.5" value="4">
+    <div class="slider-row" style="margin-top:10px;">
+      <span class="slider-label">Out-of-gamut</span>
+      <input type="range" id="chromaCompSlider" min="0" max="14" step="1" value="14">
+      <span class="slider-val" id="chromaCompLabel">INF</span>
     </div>
 
   </div>
@@ -1325,9 +1314,26 @@ function midtoneHex(hue, p) {
    STATE
    ════════════════════════════════════ */
 
+const CHROMA_COMP_STEPS = [
+  { label: 'OFF',    gamut: 'naive',    ratio: null },
+  { label: '1.25:1', gamut: 'compress', ratio: 1.25 },
+  { label: '1.5:1',  gamut: 'compress', ratio: 1.5  },
+  { label: '2:1',    gamut: 'compress', ratio: 2    },
+  { label: '2.5:1',  gamut: 'compress', ratio: 2.5  },
+  { label: '3:1',    gamut: 'compress', ratio: 3    },
+  { label: '4:1',    gamut: 'compress', ratio: 4    },
+  { label: '5:1',    gamut: 'compress', ratio: 5    },
+  { label: '6.5:1',  gamut: 'compress', ratio: 6.5  },
+  { label: '8:1',    gamut: 'compress', ratio: 8    },
+  { label: '10:1',   gamut: 'compress', ratio: 10   },
+  { label: '12:1',   gamut: 'compress', ratio: 12   },
+  { label: '15:1',   gamut: 'compress', ratio: 15   },
+  { label: '20:1',   gamut: 'compress', ratio: 20   },
+  { label: 'INF',    gamut: 'smart',    ratio: null },
+];
+
 const state = {
-  gamut: 'smart',
-  compRatio: 4,
+  chromaComp: 14,
   lSpacing: 'linear',
   colorSpace: 'oklch',
   contrastMode: 'off',
@@ -1369,8 +1375,8 @@ function getParams() {
     steps:      isPrism ? 23  : +document.getElementById('stepsSlider').value,
     hueShift:   +document.getElementById('hueShiftSlider').value,
     smooth:     state.smooth,
-    gamut:      state.gamut,
-    compRatio:  state.compRatio,
+    gamut:      CHROMA_COMP_STEPS[state.chromaComp].gamut,
+    compRatio:  CHROMA_COMP_STEPS[state.chromaComp].ratio,
     lSpacing:   state.lSpacing,
     colorSpace: state.colorSpace
   };
@@ -1612,7 +1618,8 @@ function render() {
   syncVal('darkEndVal',    p.rampDark.toFixed(3));
   syncVal('stepsVal',      p.steps);
   syncVal('hueShiftVal',   p.hueShift.toFixed(1));
-  syncVal('compRatioVal',  state.compRatio);
+  document.getElementById('chromaCompSlider').value = state.chromaComp;
+  document.getElementById('chromaCompLabel').textContent = CHROMA_COMP_STEPS[state.chromaComp].label;
 
   // Hero swatch row (dark → light, left → right to match curve canvas)
   const row = document.getElementById('swatch-row');
@@ -2138,12 +2145,10 @@ function setSmooth(enabled) {
   render();
 }
 
-function setGamut(mode) {
-  state.gamut = mode;
-  document.getElementById('opt-smart').classList.toggle('active',    mode === 'smart');
-  document.getElementById('opt-naive').classList.toggle('active',    mode === 'naive');
-  document.getElementById('opt-compress').classList.toggle('active', mode === 'compress');
-  document.getElementById('comp-ratio-row').style.display = mode === 'compress' ? 'flex' : 'none';
+function setChromaComp(stepIdx) {
+  state.chromaComp = stepIdx;
+  document.getElementById('chromaCompSlider').value = stepIdx;
+  document.getElementById('chromaCompLabel').textContent = CHROMA_COMP_STEPS[stepIdx].label;
   render();
 }
 
@@ -2373,12 +2378,13 @@ function copyText(text) {
 
 document.querySelectorAll('#controls input[type="range"]').forEach(el => {
   if (el.id === 'sysCountSlider') return;
-  if (el.id === 'compRatioSlider') return;
+  if (el.id === 'chromaCompSlider') return;
   el.addEventListener('input', render);
 });
 
-document.getElementById('compRatioSlider').addEventListener('input', function() {
-  state.compRatio = +this.value;
+document.getElementById('chromaCompSlider').addEventListener('input', function() {
+  state.chromaComp = +this.value;
+  document.getElementById('chromaCompLabel').textContent = CHROMA_COMP_STEPS[state.chromaComp].label;
   render();
 });
 
@@ -2401,7 +2407,6 @@ document.getElementById('sysCountSlider').addEventListener('input', syncSystemHu
   ['darkEndVal',    'darkEndSlider'],
   ['stepsVal',      'stepsSlider'],
   ['hueShiftVal',   'hueShiftSlider'],
-  ['compRatioVal',  'compRatioSlider'],
 ].forEach(([valId, sliderId]) => {
   const numInput = document.getElementById(valId);
   const slider   = document.getElementById(sliderId);
@@ -2411,7 +2416,6 @@ document.getElementById('sysCountSlider').addEventListener('input', syncSystemHu
     const v = +this.value;
     if (v >= +slider.min && v <= +slider.max) {
       slider.value = v;
-      if (sliderId === 'compRatioSlider') state.compRatio = v;
       render();
     }
   });
@@ -2421,7 +2425,6 @@ document.getElementById('sysCountSlider').addEventListener('input', syncSystemHu
     const v = Math.min(+slider.max, Math.max(+slider.min, +this.value));
     this.value = v;
     slider.value = v;
-    if (sliderId === 'compRatioSlider') state.compRatio = v;
     render();
   });
 });
