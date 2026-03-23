@@ -200,13 +200,13 @@ function chromaCurve(L, peakC, peakL, satMult) {
   return satMult * peakC * Math.sqrt(Math.max(0, t));
 }
 
-// PrismColor fixed 23-stop L* scale.  weight = (100 − L*) × 10;
-// weight 500 nudged to L*=49.75 for WCAG 4.5:1 against white; weight 999 = pure black.
-const PRISM_KEYS = [0, 25, 50, 75, 100, 150, 200, 250, 300, 350, 400, 450,
-                    500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 999];
-const PRISM_L    = [1.0, 0.975, 0.95, 0.925, 0.90, 0.85, 0.80, 0.75, 0.70,
+// PrismColor fixed 21-stop L* scale.  weight = (100 − L*) × 10;
+// weight 500 nudged to L*=49.75 for WCAG 4.5:1 against white.
+const PRISM_KEYS = [25, 50, 75, 100, 150, 200, 250, 300, 350, 400, 450,
+                    500, 550, 600, 650, 700, 750, 800, 850, 900, 950];
+const PRISM_L    = [0.975, 0.95, 0.925, 0.90, 0.85, 0.80, 0.75, 0.70,
                     0.65, 0.60, 0.55, 0.4975, 0.45, 0.40, 0.35, 0.30, 0.25,
-                    0.20, 0.15, 0.10, 0.05, 0.0];
+                    0.20, 0.15, 0.10, 0.05];
 
 // Maps linear t ∈ [0,1] to redistributed t based on spacing mode.
 // t=0 → light end, t=1 → dark end.
