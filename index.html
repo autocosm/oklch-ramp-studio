@@ -919,9 +919,9 @@
     </div>
 
     <div class="slider-row" style="margin-top:10px;">
-      <span class="slider-label">Out-of-gamut</span>
-      <input type="range" id="chromaCompSlider" min="0" max="14" step="1" value="14">
-      <span class="slider-val" id="chromaCompLabel">INF</span>
+      <span class="slider-label">Compression</span>
+      <input type="range" id="chromaCompSlider" min="0" max="100" step="1" value="100">
+      <span class="slider-val" id="chromaCompLabel">100%</span>
     </div>
 
   </div>
@@ -1226,36 +1226,38 @@ function findMaxChroma(L, h, colorSpace) {
   return lo;
 }
 
-// Chroma-space ratio compression. The threshold is the per-hue, per-lightness
+// Chroma-space percentage compression. The threshold is the per-hue, per-lightness
 // gamut ceiling — the maximum in-gamut chroma at exactly this L and h.
 // Colors below the ceiling pass through identically to SMART.
 // Colors above get a softer knee: excess chroma is retained but attenuated
-// by the ratio, producing a compressed C that lands between the ceiling and
+// by pct (0–100), producing a compressed C that lands between the ceiling and
 // the original request. Because hue is never touched, any residual out-of-gamut
 // amount after compression is tiny and the final RGB clamp causes only a
 // hair of lightness shift — the "dynamic" character that varies by hue angle.
-function compressGamutMap(L, C, h, ratio, colorSpace) {
+function compressGamutMap(L, C, h, pct, colorSpace) {
   const maxC = findMaxChroma(L, h, colorSpace);
   if (C <= maxC) {
     const [r, g, b] = uiToLinearRGB(L, C, h, colorSpace);
     return { r, g, b, clipped: false, actualC: C };
   }
-  // Apply ratio compression to the excess above the gamut ceiling
-  const compressedC = maxC + (C - maxC) / ratio;
+  // Attenuate the excess above the gamut ceiling by the compression percentage
+  const compressedC = maxC + (C - maxC) * (1 - pct / 100);
   const [r, g, b] = uiToLinearRGB(L, compressedC, h, colorSpace);
   return { r, g, b, clipped: true, actualC: compressedC };
 }
 
-function colorToHex(L, C, h, mode, ratio = 4, colorSpace = 'oklch') {
+function colorToHex(L, C, h, compPct, colorSpace = 'oklch') {
   let r, g, b, clipped = false, actualC;
-  if (mode === 'smart') {
-    ({ r, g, b, clipped, actualC } = smartGamutMap(L, C, h, colorSpace));
-  } else if (mode === 'compress') {
-    ({ r, g, b, clipped, actualC } = compressGamutMap(L, C, h, ratio, colorSpace));
-  } else {
-    // naive — raw channels, hard clamp (no chroma-space compression)
+  if (compPct === 0) {
+    // 0% — naive, raw channels, hard clamp (no chroma-space compression)
     [r, g, b] = uiToLinearRGB(L, C, h, colorSpace);
     if (!isInGamut(r, g, b)) clipped = true;
+  } else if (compPct === 100) {
+    // 100% — smart, binary-search for exact gamut boundary
+    ({ r, g, b, clipped, actualC } = smartGamutMap(L, C, h, colorSpace));
+  } else {
+    // 1–99% — partial chroma compression
+    ({ r, g, b, clipped, actualC } = compressGamutMap(L, C, h, compPct, colorSpace));
   }
   r = linearToSRGB(clamp01(r));
   g = linearToSRGB(clamp01(g));
@@ -1307,33 +1309,15 @@ function chromaCurve(L, peakC, peakL, satMult, lKneeL, lKneeC, rKneeL, rKneeC, d
 
 function midtoneHex(hue, p) {
   const C = chromaCurve(p.peakL, p.peakChroma, p.peakL, p.sat, p.lKneeL, p.lKneeC, p.rKneeL, p.rKneeC, p.curveDark, p.curveLight, p.peakQ);
-  return colorToHex(p.peakL, C, hue, p.gamut, p.compRatio, p.colorSpace || state.colorSpace).hex;
+  return colorToHex(p.peakL, C, hue, p.compPct, p.colorSpace || state.colorSpace).hex;
 }
 
 /* ════════════════════════════════════
    STATE
    ════════════════════════════════════ */
 
-const CHROMA_COMP_STEPS = [
-  { label: 'OFF',    gamut: 'naive',    ratio: null },
-  { label: '1.25:1', gamut: 'compress', ratio: 1.25 },
-  { label: '1.5:1',  gamut: 'compress', ratio: 1.5  },
-  { label: '2:1',    gamut: 'compress', ratio: 2    },
-  { label: '2.5:1',  gamut: 'compress', ratio: 2.5  },
-  { label: '3:1',    gamut: 'compress', ratio: 3    },
-  { label: '4:1',    gamut: 'compress', ratio: 4    },
-  { label: '5:1',    gamut: 'compress', ratio: 5    },
-  { label: '6.5:1',  gamut: 'compress', ratio: 6.5  },
-  { label: '8:1',    gamut: 'compress', ratio: 8    },
-  { label: '10:1',   gamut: 'compress', ratio: 10   },
-  { label: '12:1',   gamut: 'compress', ratio: 12   },
-  { label: '15:1',   gamut: 'compress', ratio: 15   },
-  { label: '20:1',   gamut: 'compress', ratio: 20   },
-  { label: 'INF',    gamut: 'smart',    ratio: null },
-];
-
 const state = {
-  chromaComp: 14,
+  chromaComp: 100,
   lSpacing: 'linear',
   colorSpace: 'oklch',
   contrastMode: 'off',
@@ -1375,8 +1359,7 @@ function getParams() {
     steps:      isPrism ? 21  : +document.getElementById('stepsSlider').value,
     hueShift:   +document.getElementById('hueShiftSlider').value,
     smooth:     state.smooth,
-    gamut:      CHROMA_COMP_STEPS[state.chromaComp].gamut,
-    compRatio:  CHROMA_COMP_STEPS[state.chromaComp].ratio,
+    compPct:    state.chromaComp,
     lSpacing:   state.lSpacing,
     colorSpace: state.colorSpace
   };
@@ -1531,7 +1514,7 @@ function generateRamp(p, overrideHue) {
     const L = isPrism ? PRISM_L[i] : p.rampLight - t * (p.rampLight - p.rampDark);
     const hueAtStep = baseHue + p.hueShift * (t - 0.5) * 2;
     const C = (L <= xs[0] || L >= xs[4]) ? 0 : p.sat * Math.max(0, spline(L));
-    const { hex, clipped, actualC } = colorToHex(L, C, hueAtStep, p.gamut, p.compRatio, p.colorSpace);
+    const { hex, clipped, actualC } = colorToHex(L, C, hueAtStep, p.compPct, p.colorSpace);
     const stepKey = isPrism ? PRISM_KEYS[i] : Math.round(tLinear * 900 + 50);
     swatches.push({ L, C, h: hueAtStep, hex, clipped, actualC, step: stepKey, index: i });
   }
@@ -1578,7 +1561,7 @@ function generateRamp(p, overrideHue) {
     for (let i = 0; i < n; i++) {
       if (Math.abs(smoothed[i] - values[i]) > 1e-9) {
         const s = swatches[i];
-        const { hex, clipped, actualC } = colorToHex(s.L, smoothed[i], s.h, p.gamut, p.compRatio, p.colorSpace);
+        const { hex, clipped, actualC } = colorToHex(s.L, smoothed[i], s.h, p.compPct, p.colorSpace);
         s.hex = hex;
         s.clipped = clipped;
         s.actualC = actualC;
@@ -1619,7 +1602,7 @@ function render() {
   syncVal('stepsVal',      p.steps);
   syncVal('hueShiftVal',   p.hueShift.toFixed(1));
   document.getElementById('chromaCompSlider').value = state.chromaComp;
-  document.getElementById('chromaCompLabel').textContent = CHROMA_COMP_STEPS[state.chromaComp].label;
+  document.getElementById('chromaCompLabel').textContent = state.chromaComp + '%';
 
   // Hero swatch row (dark → light, left → right to match curve canvas)
   const row = document.getElementById('swatch-row');
@@ -2145,10 +2128,10 @@ function setSmooth(enabled) {
   render();
 }
 
-function setChromaComp(stepIdx) {
-  state.chromaComp = stepIdx;
-  document.getElementById('chromaCompSlider').value = stepIdx;
-  document.getElementById('chromaCompLabel').textContent = CHROMA_COMP_STEPS[stepIdx].label;
+function setChromaComp(pct) {
+  state.chromaComp = pct;
+  document.getElementById('chromaCompSlider').value = pct;
+  document.getElementById('chromaCompLabel').textContent = pct + '%';
   render();
 }
 
@@ -2384,7 +2367,7 @@ document.querySelectorAll('#controls input[type="range"]').forEach(el => {
 
 document.getElementById('chromaCompSlider').addEventListener('input', function() {
   state.chromaComp = +this.value;
-  document.getElementById('chromaCompLabel').textContent = CHROMA_COMP_STEPS[state.chromaComp].label;
+  document.getElementById('chromaCompLabel').textContent = this.value + '%';
   render();
 });
 
