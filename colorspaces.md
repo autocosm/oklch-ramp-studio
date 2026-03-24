@@ -27,6 +27,8 @@ The result:
 - **Minimal hue shift in blue** — the blue–purple skew that plagues CIELAB is largely eliminated.
 - **Simple math** — the full transform is two 3×3 matrix multiplications and a cube root, with no correction factors or lookup tables.
 
+![Full hue-spectrum matrix with hex labels — OKLCH, dark and light mode](samples/okLCh-2026-02.png)
+
 OKLab was adopted into the CSS Color Level 4 specification as `oklch()` / `oklab()` in 2022 and is now natively supported by all major browsers.
 
 ## CIELUV and CIELChUV
@@ -55,6 +57,8 @@ In 1905, Albert H. Munsell published *A Color Notation*, the first systematic at
 - **Value** — perceived lightness, from 0 (pure black) to 10 (pure white). Munsell calibrated Value directly against human observers, not against photometric luminance — which is why the relationship between Value and CIE luminance Y is a non-linear fifth-degree polynomial (the Judd formula, standardised in ASTM D1535-18e1), not a simple power law.
 - **Chroma** — colorfulness relative to a neutral gray of the same Value. Chroma starts at 0 (pure neutral) and has no fixed upper bound — it extends as far as pigments or lights can reach at that hue and value. The practical range for most colors is 0–22, but some yellows and yellow-greens extend further.
 
+![Munsell hue x value matrix with compressed chroma curve](samples/Munsell-2026-04.png)
+
 Crucially, Munsell's coordinates were verified empirically: a large panel of trained observers arranged physical color chips into perceptually equal steps, and the resulting measurements (not a formula) define the ground truth. The 1943 renotation by Newhall, Nickerson, and Judd measured those chips against CIE colorimetric standards, producing the definitive table of CIE xyY coordinates for each (H, V, C) combination under CIE Standard Illuminant C. Every subsequent mathematical perceptual color space — CIELAB, OKLab, CIECAM02 — was designed in part to approximate the perceptual uniformity that Munsell had established empirically.
 
 Because Munsell has no closed-form formula, this implementation works by interpolating directly from the 1943 renotation data. For each requested (H, V, C) triple, the corresponding L\*C\*h°(ab) coordinates are retrieved by bilinear interpolation in the renotation table, converted from CIE Illuminant C to D65 via Bradford chromatic adaptation, and then converted to linear sRGB through the standard XYZ–sRGB matrix. The algorithm follows [munsell.js](https://github.com/privet-kitty/munsell.js) by privet-kitty (MIT).
@@ -64,6 +68,8 @@ In the tool, the three UI parameters map to Munsell coordinates as follows: **L*
 ## Why SRLAB2 was created
 
 In 2011, Jan Behrens published [SRLAB2](https://www.magnetkern.de/srlab2.html) as an intermediate position between CIELAB and the more recent perceptual models. Where CIELAB applies its cube-root nonlinearity to XYZ values scaled by the D65 reference white directly, SRLAB2 first passes those XYZ values through a re-optimized chromatic adaptation transform (based on CAT02 cone responses with Hunt-Pointer-Estevez primaries for the inverse). The resulting pre-nonlinearity values are a better substrate for the cube-root step, reducing the same blue–purple hue skew and chroma–lightness coupling that Ottosson later addressed in OKLab.
+
+![Full hue-spectrum matrix — SRLCH, dark and light mode](samples/srLCH-2026-03.png)
 
 SRLAB2 retains the identical nonlinearity form as CIELAB and produces L\* values in the same 0–100 range with chroma in comparable units — making it a direct successor to CIELAB that is more perceptually uniform without departing entirely from the CIELAB framework the way OKLab does.
 
@@ -114,8 +120,5 @@ For most SDR web and product design work, the differences between OKLCH and CIEL
 
 The images below show full hue-spectrum matrices — every hue from 0° to 360° across the columns, ramp stops 50–950 down the rows — rendered first in **OKLCH** and then in **SRLCH**, each in dark and light mode:
 
-![Full hue-spectrum matrix — OKLCH, dark and light mode](samples/okLCh-2026-01.png)
 
-![Full hue-spectrum matrix with hex labels — OKLCH, dark and light mode](samples/okLCh-2026-02.png)
 
-![Full hue-spectrum matrix — SRLCH, dark and light mode](samples/srLCH-2026-03.png)
