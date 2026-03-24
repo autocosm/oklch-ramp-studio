@@ -47,6 +47,20 @@ The input XYZ values are scaled to absolute luminance (in cd/m²) before applyin
 
 For SDR ramp generation the practical differences from OKLCH are subtle, but JzCzHz can produce slightly different hue line shapes — particularly in the blue-cyan region — and the PQ lightness compression causes the dark end of ramps to behave differently from OKLab's cube-root compression at very low L values.
 
+## The Munsell Color System
+
+In 1905, Albert H. Munsell published *A Color Notation*, the first systematic attempt to arrange colors in a three-dimensional space that corresponded to human perception rather than to the geometry of mixing pigments or light. The system defines color along three independent axes:
+
+- **Hue** — the color's apparent identity: Red, Yellow, Green, Blue, Purple, and five intermediates. Hue is expressed as a number 0–100, with the 10 named categories spanning equal 10-unit arcs. A single full rotation (0–100) corresponds to 360°.
+- **Value** — perceived lightness, from 0 (pure black) to 10 (pure white). Munsell calibrated Value directly against human observers, not against photometric luminance — which is why the relationship between Value and CIE luminance Y is a non-linear fifth-degree polynomial (the Judd formula, standardised in ASTM D1535-18e1), not a simple power law.
+- **Chroma** — colorfulness relative to a neutral gray of the same Value. Chroma starts at 0 (pure neutral) and has no fixed upper bound — it extends as far as pigments or lights can reach at that hue and value. The practical range for most colors is 0–22, but some yellows and yellow-greens extend further.
+
+Crucially, Munsell's coordinates were verified empirically: a large panel of trained observers arranged physical color chips into perceptually equal steps, and the resulting measurements (not a formula) define the ground truth. The 1943 renotation by Newhall, Nickerson, and Judd measured those chips against CIE colorimetric standards, producing the definitive table of CIE xyY coordinates for each (H, V, C) combination under CIE Standard Illuminant C. Every subsequent mathematical perceptual color space — CIELAB, OKLab, CIECAM02 — was designed in part to approximate the perceptual uniformity that Munsell had established empirically.
+
+Because Munsell has no closed-form formula, this implementation works by interpolating directly from the 1943 renotation data. For each requested (H, V, C) triple, the corresponding L\*C\*h°(ab) coordinates are retrieved by bilinear interpolation in the renotation table, converted from CIE Illuminant C to D65 via Bradford chromatic adaptation, and then converted to linear sRGB through the standard XYZ–sRGB matrix. The algorithm follows [munsell.js](https://github.com/privet-kitty/munsell.js) by privet-kitty (MIT).
+
+In the tool, the three UI parameters map to Munsell coordinates as follows: **L** [0, 1] × 10 = Munsell Value [0, 10]; **C** [0, ~0.4] × 60 = Munsell Chroma [0, ~24]; **H°** [0, 360] maps linearly to Munsell Hue [0, 100], so 0° = 5R, 90° ≈ 5Y, 180° ≈ 5G, 270° ≈ 5B.
+
 ## Why SRLAB2 was created
 
 In 2011, Jan Behrens published [SRLAB2](https://www.magnetkern.de/srlab2.html) as an intermediate position between CIELAB and the more recent perceptual models. Where CIELAB applies its cube-root nonlinearity to XYZ values scaled by the D65 reference white directly, SRLAB2 first passes those XYZ values through a re-optimized chromatic adaptation transform (based on CAT02 cone responses with Hunt-Pointer-Estevez primaries for the inverse). The resulting pre-nonlinearity values are a better substrate for the cube-root step, reducing the same blue–purple hue skew and chroma–lightness coupling that Ottosson later addressed in OKLab.
@@ -89,7 +103,14 @@ OKLab goes further — its linear transforms were fit empirically to perceptual 
 - Academic or research contexts where JzAzBz is the reference standard, or when evaluating perceptual color spaces against HDR-aware datasets.
 - Exploring JzCzHz hue angles as an alternative to OKLCH for saturated blue and cyan hues, where the two spaces can diverge measurably.
 
-For most SDR web and product design work, the differences between OKLCH and CIELCH are subtle in the midtones but clearly visible at high chroma, particularly for blues and warm yellows. LCHUV produces a distinctly different hue distribution than CIELCH — the hue angles map differently to sRGB primaries — most visibly in the yellow-green and cyan regions. SRLCH produces ramps noticeably better than CIELCH and comparable to OKLCH, with the most visible improvement in the blue and violet hue range. JzCzHz is the most suitable choice for HDR pipelines and produces results comparable to OKLCH for SDR content, with minor differences in dark compression and blue-region hue paths. For production SDR UI work, OKLCH remains the recommended default.
+**Use Munsell when:**
+
+- You need to match or validate against colors defined in the Munsell Book of Color — paint standards, soil classification (Munsell Soil Color Charts), textile specifications, or any industry workflow that records colors in H V/C notation.
+- You want to work directly in perceptually-calibrated units that predate and underlie the mathematical color spaces: Value is the lightness axis that CIELAB L\* was designed to approximate, and Chroma is measured in units that are equal-interval by human observation, not by formula.
+- You are comparing how closely modern spaces (OKLCH, CIELCH, etc.) track Munsell's empirical perceptual uniformity — Munsell is the reference standard against which those spaces are evaluated.
+- Academic or research contexts where Munsell is the agreed reference, such as color appearance experiments, paint and print standards development, or soil and botanical surveys.
+
+For most SDR web and product design work, the differences between OKLCH and CIELCH are subtle in the midtones but clearly visible at high chroma, particularly for blues and warm yellows. LCHUV produces a distinctly different hue distribution than CIELCH — the hue angles map differently to sRGB primaries — most visibly in the yellow-green and cyan regions. SRLCH produces ramps noticeably better than CIELCH and comparable to OKLCH, with the most visible improvement in the blue and violet hue range. JzCzHz is the most suitable choice for HDR pipelines and produces results comparable to OKLCH for SDR content, with minor differences in dark compression and blue-region hue paths. Munsell is the only space in this tool that is empirically defined rather than mathematically derived; its hue and value scales represent the original perceptual ground truth that the other spaces approximate, making it the natural reference when you need to cross-check against physical color standards or academic color science. For production SDR UI work, OKLCH remains the recommended default.
 
 The images below show full hue-spectrum matrices — every hue from 0° to 360° across the columns, ramp stops 50–950 down the rows — rendered first in **OKLCH** and then in **SRLCH**, each in dark and light mode:
 
