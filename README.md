@@ -67,31 +67,32 @@ The hero swatch row at the top renders **dark to light, left to right** — matc
 
 ### Chroma Curve Canvas
 
-A full-width interactive editor that sits above the control panels and serves as the primary control surface for the chroma curve. The canvas shows three layers of information simultaneously:
+A full-width interactive editor that sits above the control panels and serves as the primary control surface for the chroma curve. The canvas shows four layers of information simultaneously:
 
 - **Solid curve** — the current chroma shape, filled below and stroked in violet. The x-axis is lightness (dark on the left, light on the right); the y-axis is chroma (0 at the bottom, 0.38 at the top).
 - **Dashed ceiling** — the maximum in-gamut sRGB chroma at each lightness value for the active hue, sampled across the full L range. The ceiling adapts in real time to the Hue and Hue Shift settings, so it reflects the actual gamut boundary at whatever hue each step lands on. When the solid curve runs below the dashed line there is room to increase chroma; when it approaches or exceeds it, gamut mapping will engage.
 - **Step diamonds** — each ramp stop is plotted as a colored diamond at its exact (L, C) position. Hovering or dragging any node subdues the diamonds to make the curve shape easier to read.
+- **Gray-out overlay** — a subtle light tint covers the L range to the left of the Black Point and to the right of the White Point, indicating the regions where chroma is zero and ramp stops cannot be placed.
 
 **Dragging nodes:** Each of the five control points is directly draggable on the canvas — no need to reach for the sliders.
 
 | Node | Shape | Axes | Behaviour |
 |---|---|---|---|
-| **Dark** | Circle with vertical bar | L only | Sets the dark anchor of the chroma spline (where chroma reaches zero on the dark side). Horizontal drag only — chroma is always 0 here. |
+| **Black** | Circle with vertical bar | L only | Sets the dark anchor of the chroma spline (where chroma reaches zero on the dark side). Horizontal drag only — chroma is always 0 here. |
 | **L-Knee** | Circle | L and C | Controls the rise from the dark anchor toward the peak. Drag right to delay the rise; drag up to broaden the dark shoulder. |
 | **Peak** | Circle | L and C | The chroma apex. Drag up/down to set the peak chroma; drag left/right to shift where it falls in lightness. |
 | **R-Knee** | Circle | L and C | Controls the descent from the peak toward the light anchor. Mirrors L-Knee on the light side. |
-| **Light** | Circle with vertical bar | L only | Sets the light anchor of the chroma spline. Horizontal drag only. |
+| **White** | Circle with vertical bar | L only | Sets the light anchor of the chroma spline. Horizontal drag only. |
 
 **Selecting nodes:** A persistent tab row sits directly below the canvas, always showing all five nodes and their current parameter values at a glance. Click any tab — or click the corresponding node on the canvas — to select it. The selected tab highlights with an accent underline and its precision slider controls expand below the tab row. Click an empty area of the canvas to deselect; the tab row remains visible with the values still readable. Drag interaction and selection work simultaneously — dragging a node also selects it and activates its tab.
 
 | Tab / Node | Values shown in tab | Controls shown when active |
 |---|---|---|
-| **Dark** | `L` | Curve dark |
+| **Black** | `L` | Black Point, Dark Step |
 | **L-Knee** | `L  C` | L-Knee L, L-Knee C |
 | **Peak** | `L  C` | Peak L, Peak C, Peak Q |
 | **R-Knee** | `L  C` | R-Knee L, R-Knee C |
-| **Light** | `L` | Curve light |
+| **White** | `L` | White Point, Light Step |
 
 ### Hue & Chroma
 
@@ -104,14 +105,14 @@ A full-width interactive editor that sits above the control panels and serves as
 | **Color space** | Controls which perceptual color model is used to convert L, C, h values into sRGB hex output. When any non-OKLCH space is active, the hue gradient and gamut ceiling overlay update to reflect that space's sRGB boundary. See [Comparing color spaces](colorspaces.md) for guidance.<ul><li><strong>OKLCH</strong> (default) — OKLab (Björn Ottosson, 2020).</li><li><strong>SRLCH</strong> — SRLAB2 cylindrical coordinates (Jan Behrens, 2011), scaling L × 100 and C × 300 to SRLAB2 natural units.</li><li><strong>CIELCH</strong> — CIE L*C*h° (CIELAB cylindrical), scaling identically.</li><li><strong>LCHUV</strong> — CIELChUV, the cylindrical form of CIELUV — the same L* definition as CIELAB but with u*/v* chromatic axes derived from the CIE 1976 UCS diagram, also scaling L × 100 and C × 300.</li><li><strong>JzCzHz</strong> — cylindrical form of JzAzBz (Safdar et al., 2017), a modern HDR-capable space built on the ST 2084 PQ transfer function. Jz maps directly to the UI L range [0, 1] (D65 white ≈ 0.9999); Cz is scaled by 0.5 to match the sRGB gamut range.</li></ul> |
 | **Compression** | Sets how out-of-gamut colors are handled. **0%** clips RGB channels directly (fast, but shifts hue and lightness). **100%** binary-searches for the highest in-gamut chroma at the same L and h — hue and lightness fully preserved; recommended for design systems. **1–99%** applies partial chroma compression: the excess above the gamut ceiling is attenuated by the percentage, retaining some saturation intent with a small lightness drift. Mid values (40–80%) tend to be most useful for characterful ramps. |
 
-The remaining chroma curve controls (**Peak L**, **Peak C**, **Peak Q**, **L-Knee L/C**, **R-Knee L/C**, **Curve dark**, **Curve light**) appear in the node tab row below the canvas — click the corresponding tab or canvas node to expand its controls.
+The remaining chroma curve controls (**Peak L**, **Peak C**, **Peak Q**, **L-Knee L/C**, **R-Knee L/C**, **Black Point**, **White Point**, **Dark Step**, **Light Step**) appear in the node tab row below the canvas — click the corresponding tab or canvas node to expand its controls.
 
 ### Lightness Range & Steps
 
 | Control | Description |
 |---|---|
-| **Ramp light** | Lightness of the lightest stop (step 50). Default 0.97 ≈ near-white. Independent of the chroma curve's light anchor — steps that fall outside the curve anchor range simply receive zero chroma. |
-| **Ramp dark** | Lightness of the darkest stop (step 950). Default 0.12 ≈ very dark. Independent of the chroma curve's dark anchor. |
+| **Light Step** | Lightness of the lightest ramp stop (step 50). Default 0.97 ≈ near-white. Exposed in the **White** node tab. Cannot exceed the White Point L value — if White Point is moved below the current Light Step, Light Step is automatically clamped down to match. |
+| **Dark Step** | Lightness of the darkest ramp stop (step 950). Default 0.12 ≈ very dark. Exposed in the **Black** node tab. Cannot fall below the Black Point L value — if Black Point is moved above the current Dark Step, Dark Step is automatically clamped up to match. |
 | **Steps** | Number of stops in the ramp. Odd values only (3–21). Stop keys are distributed evenly across a 50–950 scale (e.g. 11 steps → 50, 140, 230 … 950). |
 
 ### L Spacing
@@ -241,19 +242,19 @@ Newline-separated hex values, darkest to lightest. Paste directly into Figma's "
 Rather than requiring manual chroma entry per stop, the studio uses a **5-point monotone cubic spline** to describe the chroma-vs-lightness shape. The curve passes exactly through five control points and is anchored to zero chroma at both ends:
 
 ```
-(curveDark, 0)   →   (lKneeL, lKneeC)   →   (peakL, peakC)   →   (rKneeL, rKneeC)   →   (curveLight, 0)
+(Black Point, 0)   →   (lKneeL, lKneeC)   →   (peakL, peakC)   →   (rKneeL, rKneeC)   →   (White Point, 0)
 ```
 
 This directly models design intent: you choose where chroma rises, where it peaks, and how it falls — rather than dialing abstract EQ parameters.
 
 ### Curve anchors vs. ramp range
 
-The **curve anchors** (Curve dark / Curve light) and the **ramp range** (Ramp dark / Ramp light) are independent settings:
+The **curve anchors** (Black Point / White Point) and the **ramp endpoints** (Dark Step / Light Step) are independent but constrained settings:
 
-- The curve anchors define where the chroma spline is forced to zero. They are the x-intercepts of the curve and correspond to the **Dark** and **Light** drag nodes on the canvas.
-- The ramp range defines the L values of the actual stop endpoints (step 50 and step 950). Steps that fall outside the curve anchor range receive zero chroma automatically.
+- The curve anchors define where the chroma spline is forced to zero. They are the x-intercepts of the curve and correspond to the **Black** and **White** drag nodes on the canvas. The region of the canvas outside the anchor range is visually dimmed to indicate that chroma is zero there.
+- The ramp endpoints define the L values of the actual stop boundaries (step 50 and step 950). Dark Step cannot be lower than Black Point L, and Light Step cannot exceed White Point L — the UI enforces these constraints automatically, and both controls are co-located in the Black / White node tab panels.
 
-Keeping the two controls separate lets you, for example, position the dark anchor at L = 0.15 while extending the ramp down to L = 0.05 to include a near-black neutral stop.
+This pairing lets you set the curve's zero-chroma boundary independently from the ramp endpoint, up to that boundary. For example, you can position the Black Point anchor at L = 0.15 while keeping Dark Step at the same value, or push Dark Step up to L = 0.20 to start the ramp slightly above the anchor.
 
 ### Interpolation
 
@@ -263,13 +264,13 @@ The curve is computed using the **Fritsch-Carlson monotone cubic Hermite spline*
 
 | Point | Controls |
 |---|---|
-| **Dark anchor** | Fixed at `(curveDark, 0)` — the lightness at which chroma reaches zero on the dark side. |
+| **Black Point** | Fixed at `(Black Point, 0)` — the lightness at which chroma reaches zero on the dark side. Controlled via the **Black** node tab. |
 | **L-Knee** | `(L-Knee L, L-Knee C)` — shapes how quickly chroma rises from the dark anchor toward the peak. A low L position steepens the initial rise; a high C value broadens the dark shoulder. |
 | **Peak** | `(Peak at L, Chroma Peak)` — the chroma apex, scaled by Saturation. **Peak Q** controls the bandwidth: how quickly chroma falls off on either side of the peak. Q = 1.0 is neutral (knee positions unchanged). Higher Q pulls the effective knee positions closer to the peak, sharpening the rolloff; lower Q pushes them farther apart, broadening it. The knee slider values are not modified — Q is applied internally when computing the spline. When the Peak node is selected, two tick marks on the canvas show the current effective bandwidth edges. |
 | **R-Knee** | `(R-Knee L, R-Knee C)` — shapes the descent from peak toward the light anchor. Mirrors the role of the left knee on the light side. |
-| **Light anchor** | Fixed at `(curveLight, 0)` — the lightness at which chroma reaches zero on the light side. |
+| **White Point** | Fixed at `(White Point, 0)` — the lightness at which chroma reaches zero on the light side. Controlled via the **White** node tab. |
 
-The ordering constraint `curveDark < L-Knee L < Peak at L < R-Knee L < curveLight` is enforced at render time, so the curve always has a valid shape regardless of slider positions.
+The ordering constraint `Black Point < L-Knee L < Peak at L < R-Knee L < White Point` is enforced at render time, so the curve always has a valid shape regardless of slider positions.
 
 ### Gamut ceiling overlay
 

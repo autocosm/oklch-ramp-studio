@@ -787,7 +787,7 @@
 
     <div id="node-tab-row">
       <div class="node-tab" data-node-tab="0" onclick="selectNodeTab(0)">
-        <span class="node-tab-label">Dark</span>
+        <span class="node-tab-label">Black</span>
         <span class="node-tab-vals" id="tab-vals-0">L —</span>
       </div>
       <div class="node-tab" data-node-tab="1" onclick="selectNodeTab(1)">
@@ -803,7 +803,7 @@
         <span class="node-tab-vals" id="tab-vals-3"><span id="tab-vals-3-l">L —</span><span id="tab-vals-3-c">C —</span></span>
       </div>
       <div class="node-tab" data-node-tab="4" onclick="selectNodeTab(4)">
-        <span class="node-tab-label">Light</span>
+        <span class="node-tab-label">White</span>
         <span class="node-tab-vals" id="tab-vals-4">L —</span>
       </div>
     </div>
@@ -812,9 +812,14 @@
 
       <div class="node-controls" data-node="0" hidden>
         <div class="slider-row">
-          <span class="slider-label">Curve dark</span>
+          <span class="slider-label">Black Point</span>
           <input type="range" id="curveDarkSlider" min="0.01" max="0.35" step="0.005" value="0.12">
           <input type="number" class="slider-val" id="curveDarkVal" min="0.01" max="0.35" step="0.005" value="0.12">
+        </div>
+        <div class="slider-row">
+          <span class="slider-label">Dark Step</span>
+          <input type="range" id="darkEndSlider" min="0.01" max="0.4" step="0.005" value="0.12">
+          <input type="number" class="slider-val" id="darkEndVal" min="0.01" max="0.4" step="0.005" value="0.12">
         </div>
       </div>
 
@@ -864,9 +869,14 @@
 
       <div class="node-controls" data-node="4" hidden>
         <div class="slider-row">
-          <span class="slider-label">Curve light</span>
+          <span class="slider-label">White Point</span>
           <input type="range" id="curveLightSlider" min="0.75" max="0.99" step="0.005" value="0.97">
           <input type="number" class="slider-val" id="curveLightVal" min="0.75" max="0.99" step="0.005" value="0.97">
+        </div>
+        <div class="slider-row">
+          <span class="slider-label">Light Step</span>
+          <input type="range" id="lightEndSlider" min="0.75" max="0.99" step="0.005" value="0.97">
+          <input type="number" class="slider-val" id="lightEndVal" min="0.75" max="0.99" step="0.005" value="0.97">
         </div>
       </div>
 
@@ -929,18 +939,6 @@
   <!-- Lightness Range & Steps -->
   <div class="control-panel">
     <div class="panel-title">// Lightness Range & Steps</div>
-
-    <div class="slider-row">
-      <span class="slider-label">Ramp light</span>
-      <input type="range" id="lightEndSlider" min="0.75" max="0.99" step="0.005" value="0.97">
-      <input type="number" class="slider-val" id="lightEndVal" min="0.75" max="0.99" step="0.005" value="0.97">
-    </div>
-
-    <div class="slider-row">
-      <span class="slider-label">Ramp dark</span>
-      <input type="range" id="darkEndSlider" min="0.01" max="0.4" step="0.005" value="0.12">
-      <input type="number" class="slider-val" id="darkEndVal" min="0.01" max="0.4" step="0.005" value="0.12">
-    </div>
 
     <div class="slider-row">
       <span class="slider-label">Steps</span>
@@ -1577,7 +1575,27 @@ function generateRamp(p, overrideHue) {
    PRIMARY RENDER
    ════════════════════════════════════ */
 
+function enforceStepConstraints() {
+  const darkPoint  = +document.getElementById('curveDarkSlider').value;
+  const lightPoint = +document.getElementById('curveLightSlider').value;
+
+  const darkStepEl  = document.getElementById('darkEndSlider');
+  const darkStepVal = document.getElementById('darkEndVal');
+  const lightStepEl  = document.getElementById('lightEndSlider');
+  const lightStepVal = document.getElementById('lightEndVal');
+
+  if (+darkStepEl.value < darkPoint) {
+    darkStepEl.value  = darkPoint;
+    darkStepVal.value = darkPoint;
+  }
+  if (+lightStepEl.value > lightPoint) {
+    lightStepEl.value  = lightPoint;
+    lightStepVal.value = lightPoint;
+  }
+}
+
 function render() {
+  enforceStepConstraints();
   const p = getParams();
   const swatches = generateRamp(p);
 
@@ -1758,6 +1776,13 @@ function drawCurve(p) {
   // Composite the cached background onto the main canvas.
   ctx.drawImage(_curveCache.canvas, 0, 0, W, H);
 
+  // Gray-out regions outside the ramp's lightness range
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,255,255,0.07)';
+  ctx.fillRect(0, 0, p.curveDark * W, H);
+  ctx.fillRect(p.curveLight * W, 0, W - p.curveLight * W, H);
+  ctx.restore();
+
   // Step diamonds — subdued when any node is hovered or dragged
   const anyEngaged = curveEditor.dragNodeIdx !== null || curveEditor.hoverNodeIdx !== null;
   const swatches = window._swatches || [];
@@ -1785,11 +1810,11 @@ function drawCurve(p) {
   // 5 control nodes — styled by axis freedom, highlighted when active/hovered
   ctx.font = `9px 'IBM Plex Mono', monospace`;
   const knots = [
-    { L: xs[0], C: ys[0], label: 'Dark',    axisOnly: 'L' },
+    { L: xs[0], C: ys[0], label: 'Black',   axisOnly: 'L' },
     { L: xs[1], C: ys[1], label: 'L-Knee',  axisOnly: null },
     { L: xs[2], C: ys[2], label: 'Peak',    axisOnly: null },
     { L: xs[3], C: ys[3], label: 'R-Knee',  axisOnly: null },
-    { L: xs[4], C: ys[4], label: 'Light',   axisOnly: 'L' },
+    { L: xs[4], C: ys[4], label: 'White',   axisOnly: 'L' },
   ];
   knots.forEach(({ L, C, label, axisOnly }, i) => {
     const x = L * W;
