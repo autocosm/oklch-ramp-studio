@@ -57,9 +57,11 @@ In 1905, Albert H. Munsell published *A Color Notation*, the first systematic at
 - **Value** — perceived lightness, from 0 (pure black) to 10 (pure white). Munsell calibrated Value directly against human observers, not against photometric luminance — which is why the relationship between Value and CIE luminance Y is a non-linear fifth-degree polynomial (the Judd formula, standardised in ASTM D1535-18e1), not a simple power law.
 - **Chroma** — colorfulness relative to a neutral gray of the same Value. Chroma starts at 0 (pure neutral) and has no fixed upper bound — it extends as far as pigments or lights can reach at that hue and value. The practical range for most colors is 0–22, but some yellows and yellow-greens extend further.
 
-![Munsell hue x value matrix with compressed chroma curve](samples/Munsell-2026-04.png)
+![Munsell matrix with in-gamut chroma curve](samples/Munsell-2026-05.png)
 
 Crucially, Munsell's coordinates were verified empirically: a large panel of trained observers arranged physical color chips into perceptually equal steps, and the resulting measurements (not a formula) define the ground truth. The 1943 renotation by Newhall, Nickerson, and Judd measured those chips against CIE colorimetric standards, producing the definitive table of CIE xyY coordinates for each (H, V, C) combination under CIE Standard Illuminant C. Every subsequent mathematical perceptual color space — CIELAB, OKLab, CIECAM02 — was designed in part to approximate the perceptual uniformity that Munsell had established empirically.
+
+![Munsell hue x value matrix with compressed chroma curve](samples/Munsell-2026-04.png)
 
 Because Munsell has no closed-form formula, this implementation works by interpolating directly from the 1943 renotation data. For each requested (H, V, C) triple, the corresponding L\*C\*h°(ab) coordinates are retrieved by bilinear interpolation in the renotation table, converted from CIE Illuminant C to D65 via Bradford chromatic adaptation, and then converted to linear sRGB through the standard XYZ–sRGB matrix. The algorithm follows [munsell.js](https://github.com/privet-kitty/munsell.js) by privet-kitty (MIT).
 
