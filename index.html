@@ -304,6 +304,11 @@
     flex: 1;
   }
 
+  .toggle-row > div:first-child {
+    width: 90px;
+    flex-shrink: 0;
+  }
+
   .toggle-desc {
     font-size: 10px;
     color: var(--muted);
@@ -333,6 +338,12 @@
   }
 
   .toggle-opt.active { background: var(--accent2); color: white; }
+
+  @media (max-width: 600px) {
+    .toggle-btn--cs { flex-wrap: wrap; }
+    .toggle-btn--cs .toggle-opt { flex: 1 1 33.33%; text-align: center; box-sizing: border-box; }
+    .toggle-btn--cs .toggle-opt:nth-child(n+4) { border-top: 1px solid var(--border2); }
+  }
 
   input:disabled { opacity: 0.38; pointer-events: none; }
 
@@ -919,11 +930,11 @@
       <div>
         <span class="toggle-label">Color space</span>
       </div>
-      <div class="toggle-btn">
-        <div class="toggle-opt active" id="opt-cs-oklch"  onclick="setColorSpace('oklch')">OKLCH</div>
-        <div class="toggle-opt"        id="opt-cs-srlch"  onclick="setColorSpace('srlch')">SRLCH</div>
-        <div class="toggle-opt"        id="opt-cs-cielch"   onclick="setColorSpace('cielch')">CIELCH</div>
-        <div class="toggle-opt"        id="opt-cs-cielchuv" onclick="setColorSpace('cielchuv')">LCHUV</div>
+      <div class="toggle-btn toggle-btn--cs">
+        <div class="toggle-opt active" id="opt-cs-oklch"  onclick="setColorSpace('oklch')">okLCh</div>
+        <div class="toggle-opt"        id="opt-cs-srlch"  onclick="setColorSpace('srlch')">srLCh</div>
+        <div class="toggle-opt"        id="opt-cs-cielch"   onclick="setColorSpace('cielch')">LCh</div>
+        <div class="toggle-opt"        id="opt-cs-cielchuv" onclick="setColorSpace('cielchuv')">LChuv</div>
         <div class="toggle-opt"        id="opt-cs-jzczhz"   onclick="setColorSpace('jzczhz')">JzCzHz</div>
         <div class="toggle-opt"        id="opt-cs-munsell"  onclick="setColorSpace('munsell')">Munsell</div>
       </div>
