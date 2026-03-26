@@ -339,11 +339,7 @@
 
   .toggle-opt.active { background: var(--accent2); color: white; }
 
-  @media (max-width: 600px) {
-    .toggle-btn--cs { flex-wrap: wrap; }
-    .toggle-btn--cs .toggle-opt { flex: 1 1 33.33%; text-align: center; box-sizing: border-box; }
-    .toggle-btn--cs .toggle-opt:nth-child(n+4) { border-top: 1px solid var(--border2); }
-  }
+  .toggle-btn--cs { overflow-x: auto; max-width: 100%; }
 
   input:disabled { opacity: 0.38; pointer-events: none; }
 
