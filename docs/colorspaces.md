@@ -2,163 +2,182 @@
 
 ## A brief history
 
-**CIELAB** (and its cylindrical form, **CIELCH**) was introduced by the CIE in 1976 as the first widely adopted attempt to create a *perceptually uniform* color space — one where equal numeric distances correspond to equal perceived color differences. It replaced earlier models like Munsell (which required physical samples) with a mathematical formulation derived from opponent-process color theory, using a cube-root–based lightness function and opponent `a*`/`b*` channels.
+### The Munsell Color System (1905)
 
-For two decades CIELAB was the standard for color science, ICC profiles, and industrial color management. It is still embedded in every ICC-aware application, every PDF renderer, and every print workflow.
+In 1905, Albert H. Munsell published *A Color Notation*, one of the first systems to arrange colors by how people *see* them rather than by how pigments or light mix. It defines color with three axes:
 
-## The problems with CIELAB
+- **Hue** — the color family: Red, Yellow, Green, Blue, Purple, plus five intermediates. Hue runs from 0 to 100, with the 10 named categories taking equal 10-unit arcs. One full turn (0–100) equals 360°.
+- **Value** — perceived lightness, from 0 (black) to 10 (white). Munsell Value was fit to visual judgments, not raw luminance, which is why its relation to CIE luminance Y is a non-linear fifth-degree polynomial (the Judd formula, standardised in ASTM D1535-18e1), not a simple power law.
+- **Chroma** — colorfulness relative to a neutral gray of the same Value. Chroma starts at 0 and has no fixed upper bound. In practice, most colors fall around 0–22, though some yellows and yellow-greens go higher.
 
-Despite its longevity, CIELAB has known perceptual non-uniformities that have been documented since the 1980s:
+<figure>
+  <img src="../samples/Munsell-2026-05.png" alt="Munsell matrix with in-gamut chroma curve">
+  <figcaption>Munsell matrix with in-gamut chroma curve</figcaption>
+</figure>
 
-- **Hue linearity** — perceived hue does not travel in straight lines through the `a*b*` plane. Blues in particular curve sharply toward purple as chroma increases, so a blue ramp with rising chroma will appear to shift hue even with a fixed `h°` value.
-- **Chroma–lightness coupling** — changing chroma at a fixed `L*` can noticeably shift perceived lightness, particularly in the blue and yellow regions. This makes it difficult to build ramps where every stop feels the same visual weight.
-- **Achromatic axis instability** — very desaturated colors near the neutral axis can produce slight tints in CIELAB due to the cube-root compression behaving differently near zero, causing grays to appear slightly warm or cool.
+Munsell was built empirically. Trained observers arranged physical chips into equal visual steps, and those measurements became the reference. The 1943 renotation by Newhall, Nickerson, and Judd measured the chips against CIE standards and produced the definitive CIE `xyY` table for each `(H, V, C)` under CIE Standard Illuminant C. Later perceptual spaces such as CIELAB, OKLab, and CIECAM02 were designed partly to approximate the visual uniformity Munsell established first.
 
-These issues were tolerable for color *difference* measurements (CIEDE2000 patches them with correction factors) but they create visible problems when generating UI color ramps, where the goal is a smooth, hue-stable, perceptually uniform gradient.
+<figure>
+  <img src="../samples/Munsell-2026-04.png" alt="Munsell hue x value matrix with compressed chroma curve">
+  <figcaption>Munsell hue x value matrix with compressed chroma curve</figcaption>
+</figure>
 
-## Why OKLab was created
+Because Munsell has no closed-form formula, this tool interpolates directly from the 1943 renotation data. For each requested `(H, V, C)`, it retrieves `L*C*h°(ab)` by bilinear interpolation, adapts Illuminant C to D65 with Bradford chromatic adaptation, then converts to linear sRGB through the standard XYZ→sRGB matrix. The implementation follows [munsell.js](https://github.com/privet-kitty/munsell.js) by privet-kitty (MIT).
 
-In 2020, Björn Ottosson published [OKLab](https://bottosson.github.io/posts/oklab/) — a new perceptual color space designed specifically to address CIELAB's non-uniformities. The key insight was to fit the linear transform matrices not to theoretical opponent-process responses, but to empirical data from the [IPT color space](https://www.researchgate.net/publication/221677980) and modern color appearance datasets, using a least-squares optimization over a large set of perceived-equal-difference color pairs.
+In the UI, the controls map to Munsell as follows: **L** `[0, 1] × 10 = Value [0, 10]`; **C** `[0, ~0.4] × 60 = Chroma [0, ~24]`; **H°** `[0, 360]` maps linearly to Hue `[0, 100]`, so `0° = 5R`, `90° ≈ 5Y`, `180° ≈ 5G`, and `270° ≈ 5B`.
 
-The result:
+### CIELAB and CIELUV (1976)
 
-- **Straight hue lines** — perceived hue travels in nearly straight lines through the OKLab `ab` plane, so a fixed `h` in OKLCH holds its apparent color identity across a wide chroma range.
-- **Decoupled chroma and lightness** — chroma changes at a fixed `L` produce minimal perceived lightness shift, making it reliable for ramp construction.
-- **Minimal hue shift in blue** — the blue–purple skew that plagues CIELAB is largely eliminated.
-- **Simple math** — the full transform is two 3×3 matrix multiplications and a cube root, with no correction factors or lookup tables.
+In 1976, the CIE published **CIELAB** and **CIELUV**, two mathematical attempts at perceptual uniformity. Neither was declared the single winner; each was useful in different contexts.
 
-![Full hue-spectrum matrix with hex labels — OKLCH, dark and light mode](samples/okLCh-2026-02.png)
+**CIELAB** and its cylindrical form **CIELCH** became the most widely adopted general-purpose perceptual space. It replaced systems like Munsell, which depended on physical samples, with a formula based on opponent-color theory: a cube-root lightness function plus opponent `a*` and `b*` axes.
 
-OKLab was adopted into the CSS Color Level 4 specification as `oklch()` / `oklab()` in 2022 and is now natively supported by all major browsers.
+For roughly two decades, CIELAB was the default language of color science, ICC profiles, and industrial color management. It is still embedded in ICC-aware applications, PDF rendering, and print workflows.
 
-## CIELUV and CIELChUV
+**CIELUV** was introduced alongside it. Instead of `a*` and `b*`, it projects XYZ into the CIE 1976 UCS chromaticity diagram (`u'v'`) and scales by `L*` to form `u*` and `v*`. That gives it a different chromatic structure, so CIELUV hue angles are not the same as CIELAB hue angles for the same physical color.
 
-CIELUV was published by the CIE in 1976 alongside CIELAB — both were attempts at perceptual uniformity, and neither was declared the winner. CIELAB uses opponent-process `a*`/`b*` axes derived from a cube-root compression of XYZ. CIELUV takes a different approach: it applies a projective transform of XYZ to the *CIE 1976 UCS chromaticity diagram* (`u'v'`), then scales by L\* to produce `u*`/`v*` opponent channels. The result is a different chromatic structure — CIELUV hue angles are not the same as CIELAB hue angles for the same physical color.
+Historically, CIELUV was favored more in **lighting and illumination**, where additive mixtures of emitted light are common. CIELAB became dominant in **print and colorimetry**, where reflectance and subtractive workflows matter more. Both spaces share the same `L*` definition and many of the same uniformity limits; the main difference is the chromatic axes used to express color.
 
-CIELUV was historically favored in the **lighting and illumination industry**, where additive color mixtures (light sources, displays, luminaires) are common and the projective chromaticity structure aligns better with how emitted light mixes. CIELAB became dominant in the **print and colorimetry industry**, where reflectance and subtractive mixing are primary. Both spaces share the same L\* definition and the same known non-uniformities in hue linearity and chroma–lightness coupling — they differ primarily in which chromatic axes they use to express color differences.
+**CIELChUV** is the cylindrical form of CIELUV:
 
-CIELChUV is the cylindrical projection: `C*_uv = sqrt(u*² + v*²)` and `h_uv = atan2(v*, u*)`. It is comparable to CIELCH in structure but with a different hue rotation and different gamut boundaries in the u\*v\* plane.
+`C*_uv = sqrt(u*² + v*²)` and `h_uv = atan2(v*, u*)`
 
-## JzAzBz and JzCzHz
+It is structurally similar to CIELCH, but with different hue rotation and different gamut boundaries in the `u*v*` plane.
 
-In 2017, Safdar et al. published [JzAzBz](https://doi.org/10.1364/OE.25.015131) as a perceptual color space designed specifically for **high dynamic range (HDR) and wide gamut (WCG) content**. Where OKLab uses a cube-root nonlinearity calibrated for SDR displays, JzAzBz replaces it with the **ST 2084 Perceptual Quantizer (PQ)** transfer function — the same electro-optical transfer function used in HDR10 and Dolby Vision. The PQ function is optimized for the full luminance range of human vision (0.001 to 10,000 cd/m²), making JzAzBz perceptually uniform across a much wider brightness span than any CIE-derived space.
+### Where CIELAB falls short
 
-The input XYZ values are scaled to absolute luminance (in cd/m²) before applying the PQ function, using a reference white of 203 cd/m² — the standard "reference white" in the HDR10 PQ encoding system. For SDR content where Y = 1 corresponds to approximately 100–203 cd/m², this places sRGB white at Jz ≈ 0.9999. Jz therefore maps almost directly onto the UI's L slider range [0, 1] without additional scaling.
+CIELAB has well-known perceptual non-uniformities, documented since the 1980s:
 
-**JzCzHz** is the cylindrical projection: `Cz = sqrt(az² + bz²)` and `Hz = atan2(bz, az)`. It is analogous to OKLCH in structure but uses PQ-based lightness and a different set of cone-response matrices (M1 and M2 from the paper) designed to minimize hue–chroma coupling across the full luminance range.
+- **Hue linearity** — perceived hue does not move in straight lines through the `a*b*` plane. Blues especially bend toward purple as chroma increases, so a ramp can seem to shift hue even when `h°` is fixed.
+- **Chroma-lightness coupling** — changing chroma at a fixed `L*` can change perceived lightness, especially in blue and yellow regions. That makes equal-weight ramps harder to build.
+- **Achromatic-axis instability** — very low-chroma colors near neutral can pick up slight warm or cool casts because the cube-root compression behaves unevenly near zero.
 
-For SDR ramp generation the practical differences from OKLCH are subtle, but JzCzHz can produce slightly different hue line shapes — particularly in the blue-cyan region — and the PQ lightness compression causes the dark end of ramps to behave differently from OKLab's cube-root compression at very low L values.
+These issues are often tolerable for color-difference work, where formulas like CIEDE2000 add corrections. They are more visible in UI ramps, where the goal is a smooth, hue-stable gradient.
 
-## The Munsell Color System
+### SRLAB2 (2011)
 
-In 1905, Albert H. Munsell published *A Color Notation*, the first systematic attempt to arrange colors in a three-dimensional space that corresponded to human perception rather than to the geometry of mixing pigments or light. The system defines color along three independent axes:
+In 2011, Jan Behrens published [SRLAB2](https://www.magnetkern.de/srlab2.html) as a bridge between CIELAB and newer perceptual models. SRLAB2 keeps the same cube-root-style nonlinearity and a familiar `L*` range of 0–100, but improves the input stage by first applying a re-optimized chromatic adaptation transform based on CAT02 cone responses with Hunt-Pointer-Estevez primaries for the inverse.
 
-- **Hue** — the color's apparent identity: Red, Yellow, Green, Blue, Purple, and five intermediates. Hue is expressed as a number 0–100, with the 10 named categories spanning equal 10-unit arcs. A single full rotation (0–100) corresponds to 360°.
-- **Value** — perceived lightness, from 0 (pure black) to 10 (pure white). Munsell calibrated Value directly against human observers, not against photometric luminance — which is why the relationship between Value and CIE luminance Y is a non-linear fifth-degree polynomial (the Judd formula, standardised in ASTM D1535-18e1), not a simple power law.
-- **Chroma** — colorfulness relative to a neutral gray of the same Value. Chroma starts at 0 (pure neutral) and has no fixed upper bound — it extends as far as pigments or lights can reach at that hue and value. The practical range for most colors is 0–22, but some yellows and yellow-greens extend further.
+That change reduces the blue-purple skew and chroma-lightness coupling seen in CIELAB, while staying closer to the CIELAB framework than OKLab later would.
 
-![Munsell matrix with in-gamut chroma curve](samples/Munsell-2026-05.png)
+<figure>
+  <img src="../samples/srLCH-2026-03.png" alt="Full hue-spectrum matrix — SRLCH, dark and light mode">
+  <figcaption>Full hue-spectrum matrix — SRLCH, dark and light mode</figcaption>
+</figure>
 
-Crucially, Munsell's coordinates were verified empirically: a large panel of trained observers arranged physical color chips into perceptually equal steps, and the resulting measurements (not a formula) define the ground truth. The 1943 renotation by Newhall, Nickerson, and Judd measured those chips against CIE colorimetric standards, producing the definitive table of CIE xyY coordinates for each (H, V, C) combination under CIE Standard Illuminant C. Every subsequent mathematical perceptual color space — CIELAB, OKLab, CIECAM02 — was designed in part to approximate the perceptual uniformity that Munsell had established empirically.
+SRLAB2 is therefore a useful stepping stone: more uniform than CIELAB, still easy to compare with CIELAB-based tools, and less disruptive if you already work in `L*C*h°` terms.
 
-![Munsell hue x value matrix with compressed chroma curve](samples/Munsell-2026-04.png)
+### JzAzBz / JzCzHz (2017)
 
-Because Munsell has no closed-form formula, this implementation works by interpolating directly from the 1943 renotation data. For each requested (H, V, C) triple, the corresponding L\*C\*h°(ab) coordinates are retrieved by bilinear interpolation in the renotation table, converted from CIE Illuminant C to D65 via Bradford chromatic adaptation, and then converted to linear sRGB through the standard XYZ–sRGB matrix. The algorithm follows [munsell.js](https://github.com/privet-kitty/munsell.js) by privet-kitty (MIT).
+In 2017, Safdar et al. published [JzAzBz](https://doi.org/10.1364/OE.25.015131), a perceptual space built for **high dynamic range (HDR)** and **wide gamut (WCG)** imaging. Instead of a cube-root transfer like CIELAB or OKLab, it uses the **ST 2084 Perceptual Quantizer (PQ)** transfer function, the same HDR electro-optical transfer function used in HDR10 and Dolby Vision.
 
-In the tool, the three UI parameters map to Munsell coordinates as follows: **L** [0, 1] × 10 = Munsell Value [0, 10]; **C** [0, ~0.4] × 60 = Munsell Chroma [0, ~24]; **H°** [0, 360] maps linearly to Munsell Hue [0, 100], so 0° = 5R, 90° ≈ 5Y, 180° ≈ 5G, 270° ≈ 5B.
+PQ is designed for the full human luminance range, about `0.001` to `10,000 cd/m²`, so JzAzBz stays perceptually meaningful across a much wider brightness span than older CIE-derived spaces.
 
-## Why SRLAB2 was created
+Before PQ is applied, XYZ values are scaled to absolute luminance in `cd/m²`, using a reference white of `203 cd/m²`, the standard PQ reference white in HDR10 systems. For SDR content where `Y = 1` maps to roughly `100–203 cd/m²`, sRGB white lands near `Jz ≈ 0.9999`, so `Jz` lines up closely with a UI lightness slider in `[0, 1]`.
 
-In 2011, Jan Behrens published [SRLAB2](https://www.magnetkern.de/srlab2.html) as an intermediate position between CIELAB and the more recent perceptual models. Where CIELAB applies its cube-root nonlinearity to XYZ values scaled by the D65 reference white directly, SRLAB2 first passes those XYZ values through a re-optimized chromatic adaptation transform (based on CAT02 cone responses with Hunt-Pointer-Estevez primaries for the inverse). The resulting pre-nonlinearity values are a better substrate for the cube-root step, reducing the same blue–purple hue skew and chroma–lightness coupling that Ottosson later addressed in OKLab.
+**JzCzHz** is the cylindrical form:
 
-![Full hue-spectrum matrix — SRLCH, dark and light mode](samples/srLCH-2026-03.png)
+`Cz = sqrt(az² + bz²)` and `Hz = atan2(bz, az)`
 
-SRLAB2 retains the identical nonlinearity form as CIELAB and produces L\* values in the same 0–100 range with chroma in comparable units — making it a direct successor to CIELAB that is more perceptually uniform without departing entirely from the CIELAB framework the way OKLab does.
+It is structurally similar to OKLCH, but it uses PQ-based lightness and the paper’s `M1` and `M2` cone-response matrices to reduce hue-chroma coupling across HDR luminance ranges.
 
-OKLab goes further — its linear transforms were fit empirically to perceptual difference data — and generally outperforms SRLAB2 on hue uniformity benchmarks. But SRLAB2 is a useful intermediate reference, especially when transitioning from a CIELAB workflow or cross-referencing against SRLAB2-based tools.
+For SDR ramp generation, the difference from OKLCH is usually subtle. The biggest visible changes tend to appear in blue-cyan hue paths and in how the darkest tones compress.
+
+### OKLab / OKLCH (2020)
+
+In 2020, Björn Ottosson published [OKLab](https://bottosson.github.io/posts/oklab/) to address CIELAB’s remaining non-uniformities in modern design and imaging work. The key change was methodological: instead of fitting the space to a theoretical opponent model alone, OKLab fits its transforms to empirical data from the [IPT color space](https://www.researchgate.net/publication/221677980) and modern color-appearance datasets using least-squares optimization over many perceived-equal-difference color pairs.
+
+The result is a space with:
+
+- **Straighter hue paths** — perceived hue travels nearly linearly in the OKLab `ab` plane, so a fixed `h` in OKLCH usually keeps the same visual identity as chroma rises.
+- **Better separation of chroma and lightness** — changing chroma at fixed `L` causes less unwanted lightness shift.
+- **Less blue skew** — the classic LAB tendency for saturated blues to drift toward purple is greatly reduced.
+- **Simple math** — two `3×3` matrix multiplications plus a cube root, with no lookup tables or correction factors.
+
+<figure>
+  <img src="../samples/okLCh-2026-02.png" alt="Full hue-spectrum matrix with hex labels — OKLCH, dark and light mode">
+  <figcaption>Full hue-spectrum matrix with hex labels — OKLCH, dark and light mode</figcaption>
+</figure>
+
+OKLab was added to CSS Color Level 4 as `oklab()` and `oklch()` in 2022, and is now supported by all major browsers. For SDR product and web work, it is the most practical perceptual default in this tool.
 
 ## When to use each
 
 **Use OKLCH (default) when:**
 
-- Building a production UI ramp. OKLCH gives the most predictable hue stability across the lightness range and is the correct choice for anything that will ship.
-- Working with saturated hues, especially blues, teals, or purples — where CIELAB's hue skew is most pronounced.
-- You want the chroma curve you've drawn to translate faithfully to perceived colorfulness at every step.
-- Comparing or exporting alongside CSS `oklch()` values.
+- Building a production UI ramp where hue stability matters.
+- Working with saturated blues, teals, or purples, where CIELAB’s skew is most visible.
+- You want the chroma curve you drew to track perceived colorfulness closely.
+- Comparing or exporting against CSS `oklch()` values.
 
 **Use CIELCH when:**
 
-- You need to match or cross-reference colors defined in an existing CIELAB-based workflow — ICC profiles, colorimetry reports, print specifications.
-- You want to see the historical CIELAB rendering of a ramp for comparison or academic purposes.
-- Your target rendering pipeline internally uses CIELAB (some older design tools, colorimetric measurements, textile industry workflows).
+- Matching an older CIELAB-based workflow such as ICC, print, textile, or colorimetry references.
+- Comparing a modern ramp against the historical CIELAB rendering.
+- Your downstream pipeline still works internally in CIELAB.
 
 **Use LCHUV when:**
 
-- You need to cross-reference colors defined in a CIELUV-based workflow — display colorimetry, illumination engineering, or lighting-industry color specifications.
-- You want to compare CIELUV's chromatic structure against CIELAB for the same ramp (the two spaces produce noticeably different hue distributions, particularly in the yellow-green and blue-cyan regions).
-- Academic or research contexts where CIELUV is the reference standard.
+- Matching CIELUV-based lighting, display, or illumination specifications.
+- Comparing CIELUV’s chromatic structure against CIELAB for the same ramp.
+- Working in a research context where CIELUV is the stated reference.
 
 **Use SRLCH when:**
 
-- You want CIELAB's familiar L\*C\*h° framework and 0–100 L\* scale with reduced hue skew.
+- You want familiar `L*C*h°` behavior with less LAB hue skew.
 - Comparing against SRLAB2-based tools or validating an SRLAB2 implementation.
-- Academic or research contexts where SRLAB2 is the reference standard.
+- You need an intermediate reference between CIELAB and OKLab.
 
 **Use JzCzHz when:**
 
-- Building ramps that will be used in an HDR or wide-gamut context (e.g., ramps for display-P3 or Rec. 2020 targets), where JzAzBz's PQ-based lightness is a better model of the display pipeline than a cube-root approximation.
-- Comparing OKLCH output against a JzAzBz reference implementation to validate that both produce equivalent perceived neutrality and hue stability for a given SDR ramp.
-- Academic or research contexts where JzAzBz is the reference standard, or when evaluating perceptual color spaces against HDR-aware datasets.
-- Exploring JzCzHz hue angles as an alternative to OKLCH for saturated blue and cyan hues, where the two spaces can diverge measurably.
+- Building for HDR or wide-gamut targets such as Display-P3 or Rec. 2020.
+- Comparing OKLCH against an HDR-aware perceptual model.
+- Evaluating dark-end compression or blue-cyan behavior under PQ-based lightness.
 
 **Use Munsell when:**
 
-- You need to match or validate against colors defined in the Munsell Book of Color — paint standards, soil classification (Munsell Soil Color Charts), textile specifications, or any industry workflow that records colors in H V/C notation.
-- You want to work directly in perceptually-calibrated units that predate and underlie the mathematical color spaces: Value is the lightness axis that CIELAB L\* was designed to approximate, and Chroma is measured in units that are equal-interval by human observation, not by formula.
-- You are comparing how closely modern spaces (OKLCH, CIELCH, etc.) track Munsell's empirical perceptual uniformity — Munsell is the reference standard against which those spaces are evaluated.
-- Academic or research contexts where Munsell is the agreed reference, such as color appearance experiments, paint and print standards development, or soil and botanical surveys.
+- Matching physical standards such as the Munsell Book of Color or Soil Color Charts.
+- Working in perceptual units rooted in visual observation rather than a fitted formula.
+- Comparing how closely modern spaces track empirical perceptual uniformity.
 
-For most SDR web and product design work, the differences between OKLCH and CIELCH are subtle in the midtones but clearly visible at high chroma, particularly for blues and warm yellows. LCHUV produces a distinctly different hue distribution than CIELCH — the hue angles map differently to sRGB primaries — most visibly in the yellow-green and cyan regions. SRLCH produces ramps noticeably better than CIELCH and comparable to OKLCH, with the most visible improvement in the blue and violet hue range. JzCzHz is the most suitable choice for HDR pipelines and produces results comparable to OKLCH for SDR content, with minor differences in dark compression and blue-region hue paths. Munsell is the only space in this tool that is empirically defined rather than mathematically derived; its hue and value scales represent the original perceptual ground truth that the other spaces approximate, making it the natural reference when you need to cross-check against physical color standards or academic color science. For production SDR UI work, OKLCH remains the recommended default.
+For most SDR web and product design, OKLCH remains the recommended default. CIELCH is mainly useful for compatibility, LCHUV for lighting-oriented references, SRLCH as a better-LAB bridge, JzCzHz for HDR work, and Munsell as the historical empirical baseline.
 
 ## Illuminant
 
-Every color space in this tool is defined relative to a *reference white* — the XYZ triplet that represents "perfect white" for that space. All six color spaces use **D65** as their reference white by default, which corresponds to average northern-hemisphere daylight at approximately 6500 K and is the standard for sRGB, CSS color, and screen-based design.
+Every color space in this tool is defined relative to a *reference white*: the XYZ triplet treated as “perfect white” for that space. All six spaces use **D65** by default, which approximates average northern-hemisphere daylight at about `6500 K` and is the standard white for sRGB, CSS color, and screen design.
 
-The **Illuminant** setting applies a [Bradford chromatic adaptation transform (CAT)](https://en.wikipedia.org/wiki/Chromatic_adaptation) to the linear RGB output of the chosen color space, simulating how the palette would appear under a different illuminant when viewed on a D65 display. The adaptation is applied before gamut mapping, so the gamut ceiling shown on the curve canvas also updates to reflect the adapted color volume.
+The **Illuminant** setting applies a [Bradford chromatic adaptation transform (CAT)](https://en.wikipedia.org/wiki/Chromatic_adaptation) to the linear RGB output of the selected color space. This simulates how the palette would look under another illuminant while still being viewed on a D65 display. The adaptation happens *before* gamut mapping, so the gamut ceiling shown on the curve canvas updates to match the adapted color volume.
 
 ### D50 — warm
 
-D50 (5000 K) is the standard illuminant for **graphic arts and print**. ICC profiles for print workflows — CMYK press, proofing, physical color standards — are defined under D50. Under D50 illumination, whites appear slightly warm and yellowish compared to D65: reds and oranges are boosted, blues are pulled back.
+D50 (`5000 K`) is the standard illuminant for **graphic arts and print**. ICC print workflows, including CMYK press and proofing, are defined under D50. Compared with D65, D50 makes whites look warmer: reds and oranges are emphasized, while blues are reduced.
 
 Use D50 when:
-- Designing palettes intended for print or soft-proofing against a D50-calibrated monitor
-- Previewing how a D65 screen palette reads under warm indoor or print-booth lighting
-- Matching output to ICC-profile color management pipelines that use D50 as the profile connection space
+- Designing for print or soft-proofing on a D50-calibrated monitor
+- Previewing how a D65 palette reads under warm indoor or print-booth lighting
+- Matching ICC-managed pipelines that use D50 as the profile connection space
 
 ### Standard D65 — neutral (default)
 
-D65 (6500 K) is the reference illuminant for sRGB, Display P3, Rec. 709, and all CSS color functions. It is the correct choice for any palette that will be displayed on screen without color management conversion. No chromatic adaptation is applied; output is identical to the raw color space conversion.
+D65 (`6500 K`) is the reference illuminant for sRGB, Display P3, Rec. 709, and all CSS color functions. For ordinary screen work, this is the correct setting. No chromatic adaptation is applied.
 
 ### D75 — cool
 
-D75 (7500 K) approximates overcast daylight or a northern skylight — a cooler, bluer illuminant than D65. Under D75, blues are intensified and reds are slightly reduced, making palettes read with a cool, crisp character.
+D75 (`7500 K`) approximates overcast daylight or cool skylight. Compared with D65, it makes palettes feel cooler and crisper: blues strengthen slightly and reds recede.
 
 Use D75 when:
-- Designing for environments with cool ambient lighting (north-facing windows, overcast outdoor displays)
-- Exploring how a palette behaves at the cooler end of the daylight range
-- Academic comparison of illuminant effects on perceptual color rendering
+- Designing for cooler ambient-light environments
+- Exploring palette behavior at the cool end of the daylight range
+- Comparing illuminant effects in research or teaching
 
 ### How the adaptation works
 
-The implementation uses the **Bradford cone response model** to compute a 3×3 linear RGB→RGB matrix for each target illuminant. The full transform chain is:
+The implementation uses the **Bradford cone-response model** to compute a `3×3` linear RGB→RGB matrix for the selected illuminant. The transform chain is:
 
-```
+```text
 linear sRGB (D65) → XYZ_D65 → Bradford LMS → scale by (dest white / D65 white) → Bradford LMS⁻¹ → XYZ_adapted → linear sRGB
 ```
 
-This is collapsed into a single pre-computed matrix applied inside `uiToLinearRGB()`. Because the adaptation runs before gamut mapping, the binary-search that finds the sRGB gamut ceiling operates in the adapted color volume — the clipping indicators on the curve canvas accurately reflect which colors will be clipped after the warm or cool shift is applied.
+This is collapsed into one precomputed matrix inside `uiToLinearRGB()`. Because adaptation runs before gamut mapping, the binary search for the sRGB gamut ceiling operates on the adapted color volume, so the clipping indicators on the curve canvas reflect the colors that will clip after the warm or cool shift.
 
-The images below show full hue-spectrum matrices — every hue from 0° to 360° across the columns, ramp stops 50–950 down the rows — rendered first in **OKLCH** and then in **SRLCH**, each in dark and light mode:
-
-
-
+The images below show full hue-spectrum matrices — every hue from `0°` to `360°` across the columns, ramp stops `50–950` down the rows — rendered first in **OKLCH** and then in **SRLCH**, each in dark and light mode:
