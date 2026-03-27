@@ -939,6 +939,17 @@
       </div>
     </div>
 
+    <div class="toggle-row" style="margin-top:10px;">
+      <div>
+        <span class="toggle-label">Illuminant</span>
+      </div>
+      <div class="toggle-btn">
+        <div class="toggle-opt"        id="opt-il-d50" onclick="setIlluminant('d50')">D50</div>
+        <div class="toggle-opt active" id="opt-il-d65" onclick="setIlluminant('d65')">Standard D65</div>
+        <div class="toggle-opt"        id="opt-il-d75" onclick="setIlluminant('d75')">D75</div>
+      </div>
+    </div>
+
     <div class="slider-row" style="margin-top:10px;">
       <span class="slider-label">Compression</span>
       <input type="range" id="chromaCompSlider" min="0" max="100" step="1" value="100">
@@ -1073,6 +1084,29 @@ const SRLCH_L_SCALE    = 100;
 const SRLCH_C_SCALE    = 300;
 const JZCZHZ_L_SCALE   = 1;    // Jz ≈ [0, 1] for SDR (D65 white ≈ 0.9999 at 203 cd/m²)
 const JZCZHZ_C_SCALE   = 0.5;  // Cz sRGB max ≈ 0.22; UI C [0, ~0.4] × 0.5 = [0, ~0.2]
+
+// Bradford chromatic adaptation matrices in linear sRGB space.
+// Each matrix adapts D65-native linear RGB to appear as viewed under the target illuminant
+// on a D65 display. Derived from: M_sRGB_from_XYZ × M_Bradford_inv × diag(dest/src) × M_Bradford × M_XYZ_from_sRGB.
+// D50 white (warmer, print-standard): XYZ = [0.96422, 1.00000, 0.82521]
+const CAT_D50 = [
+  [ 1.04788,  0.02292, -0.05022],
+  [ 0.02959,  0.99048, -0.01706],
+  [-0.00925,  0.01503,  0.75196]
+];
+// D75 white (cooler): XYZ = [0.94972, 1.00000, 1.22638]
+const CAT_D75 = [
+  [ 0.97376, -0.03627, -0.00730],
+  [ 0.00114,  1.00622, -0.00282],
+  [ 0.00333,  0.01198,  1.13163]
+];
+function applyCAT(m, r, g, b) {
+  return [
+    m[0][0]*r + m[0][1]*g + m[0][2]*b,
+    m[1][0]*r + m[1][1]*g + m[1][2]*b,
+    m[2][0]*r + m[2][1]*g + m[2][2]*b
+  ];
+}
 
 // SRLAB2 (Jan Behrens 2011) cylindrical srL*C*h° → linear sRGB.
 // L in [0, 100], C in [0, ~150], h in degrees.
@@ -1267,13 +1301,17 @@ function munsellHVCToLinearRGB(V, C, h) {
   ];
 }
 
-function uiToLinearRGB(L, C, h, colorSpace) {
-  if (colorSpace === 'cielch')   return cielchToLinearRGB(L * CIELCH_L_SCALE,     C * CIELCH_C_SCALE,   h);
-  if (colorSpace === 'cielchuv') return cielchuvToLinearRGB(L * CIELCHUV_L_SCALE, C * CIELCHUV_C_SCALE, h);
-  if (colorSpace === 'srlch')    return srlchToLinearRGB(L * SRLCH_L_SCALE,       C * SRLCH_C_SCALE,    h);
-  if (colorSpace === 'jzczhz')   return jzczhzToLinearRGB(L * JZCZHZ_L_SCALE,     C * JZCZHZ_C_SCALE,   h);
-  if (colorSpace === 'munsell')  return munsellHVCToLinearRGB(L * MUNSELL_V_SCALE, C * MUNSELL_C_SCALE,  h);
-  return oklchToLinearRGB(L, C, h);
+function uiToLinearRGB(L, C, h, colorSpace, illuminant = 'd65') {
+  let rgb;
+  if (colorSpace === 'cielch')   rgb = cielchToLinearRGB(L * CIELCH_L_SCALE,     C * CIELCH_C_SCALE,   h);
+  else if (colorSpace === 'cielchuv') rgb = cielchuvToLinearRGB(L * CIELCHUV_L_SCALE, C * CIELCHUV_C_SCALE, h);
+  else if (colorSpace === 'srlch')    rgb = srlchToLinearRGB(L * SRLCH_L_SCALE,       C * SRLCH_C_SCALE,    h);
+  else if (colorSpace === 'jzczhz')   rgb = jzczhzToLinearRGB(L * JZCZHZ_L_SCALE,     C * JZCZHZ_C_SCALE,   h);
+  else if (colorSpace === 'munsell')  rgb = munsellHVCToLinearRGB(L * MUNSELL_V_SCALE, C * MUNSELL_C_SCALE,  h);
+  else rgb = oklchToLinearRGB(L, C, h);
+  if (illuminant === 'd50') return applyCAT(CAT_D50, ...rgb);
+  if (illuminant === 'd75') return applyCAT(CAT_D75, ...rgb);
+  return rgb;
 }
 
 function linearToSRGB(c) {
@@ -1286,16 +1324,16 @@ function isInGamut(r, g, b, eps = 0.001) {
   return r >= -eps && r <= 1+eps && g >= -eps && g <= 1+eps && b >= -eps && b <= 1+eps;
 }
 
-function smartGamutMap(L, C, h, colorSpace) {
-  let [r, g, b] = uiToLinearRGB(L, C, h, colorSpace);
+function smartGamutMap(L, C, h, colorSpace, illuminant = 'd65') {
+  let [r, g, b] = uiToLinearRGB(L, C, h, colorSpace, illuminant);
   if (isInGamut(r, g, b)) return { r, g, b, clipped: false, actualC: C };
   let lo = 0, hi = C, mid;
   for (let i = 0; i < 24; i++) {
     mid = (lo + hi) / 2;
-    [r, g, b] = uiToLinearRGB(L, mid, h, colorSpace);
+    [r, g, b] = uiToLinearRGB(L, mid, h, colorSpace, illuminant);
     isInGamut(r, g, b) ? (lo = mid) : (hi = mid);
   }
-  [r, g, b] = uiToLinearRGB(L, lo, h, colorSpace);
+  [r, g, b] = uiToLinearRGB(L, lo, h, colorSpace, illuminant);
   return { r, g, b, clipped: true, actualC: lo };
 }
 
@@ -1331,17 +1369,17 @@ function apcaContrast(textHex, bgHex) {
   return Lc;
 }
 
-function findMaxChroma(L, h, colorSpace) {
+function findMaxChroma(L, h, colorSpace, illuminant = 'd65') {
   let lo = 0, hi = 0.5, mid;
   // Ensure hi is actually out of gamut before searching
-  let [r, g, b] = uiToLinearRGB(L, hi, h, colorSpace);
+  let [r, g, b] = uiToLinearRGB(L, hi, h, colorSpace, illuminant);
   if (isInGamut(r, g, b)) {
     // Expand until we find an out-of-gamut value
-    while (isInGamut(...uiToLinearRGB(L, hi, h, colorSpace)) && hi < 1) hi *= 2;
+    while (isInGamut(...uiToLinearRGB(L, hi, h, colorSpace, illuminant)) && hi < 1) hi *= 2;
   }
   for (let i = 0; i < 28; i++) {
     mid = (lo + hi) / 2;
-    [r, g, b] = uiToLinearRGB(L, mid, h, colorSpace);
+    [r, g, b] = uiToLinearRGB(L, mid, h, colorSpace, illuminant);
     isInGamut(r, g, b) ? (lo = mid) : (hi = mid);
   }
   return lo;
@@ -1355,30 +1393,30 @@ function findMaxChroma(L, h, colorSpace) {
 // the original request. Because hue is never touched, any residual out-of-gamut
 // amount after compression is tiny and the final RGB clamp causes only a
 // hair of lightness shift — the "dynamic" character that varies by hue angle.
-function compressGamutMap(L, C, h, pct, colorSpace) {
-  const maxC = findMaxChroma(L, h, colorSpace);
+function compressGamutMap(L, C, h, pct, colorSpace, illuminant = 'd65') {
+  const maxC = findMaxChroma(L, h, colorSpace, illuminant);
   if (C <= maxC) {
-    const [r, g, b] = uiToLinearRGB(L, C, h, colorSpace);
+    const [r, g, b] = uiToLinearRGB(L, C, h, colorSpace, illuminant);
     return { r, g, b, clipped: false, actualC: C };
   }
   // Attenuate the excess above the gamut ceiling by the compression percentage
   const compressedC = maxC + (C - maxC) * (1 - pct / 100);
-  const [r, g, b] = uiToLinearRGB(L, compressedC, h, colorSpace);
+  const [r, g, b] = uiToLinearRGB(L, compressedC, h, colorSpace, illuminant);
   return { r, g, b, clipped: true, actualC: compressedC };
 }
 
-function colorToHex(L, C, h, compPct, colorSpace = 'oklch') {
+function colorToHex(L, C, h, compPct, colorSpace = 'oklch', illuminant = 'd65') {
   let r, g, b, clipped = false, actualC;
   if (compPct === 0) {
     // 0% — naive, raw channels, hard clamp (no chroma-space compression)
-    [r, g, b] = uiToLinearRGB(L, C, h, colorSpace);
+    [r, g, b] = uiToLinearRGB(L, C, h, colorSpace, illuminant);
     if (!isInGamut(r, g, b)) clipped = true;
   } else if (compPct === 100) {
     // 100% — smart, binary-search for exact gamut boundary
-    ({ r, g, b, clipped, actualC } = smartGamutMap(L, C, h, colorSpace));
+    ({ r, g, b, clipped, actualC } = smartGamutMap(L, C, h, colorSpace, illuminant));
   } else {
     // 1–99% — partial chroma compression
-    ({ r, g, b, clipped, actualC } = compressGamutMap(L, C, h, compPct, colorSpace));
+    ({ r, g, b, clipped, actualC } = compressGamutMap(L, C, h, compPct, colorSpace, illuminant));
   }
   r = linearToSRGB(clamp01(r));
   g = linearToSRGB(clamp01(g));
@@ -1430,7 +1468,7 @@ function chromaCurve(L, peakC, peakL, satMult, lKneeL, lKneeC, rKneeL, rKneeC, d
 
 function midtoneHex(hue, p) {
   const C = chromaCurve(p.peakL, p.peakChroma, p.peakL, p.sat, p.lKneeL, p.lKneeC, p.rKneeL, p.rKneeC, p.curveDark, p.curveLight, p.peakQ);
-  return colorToHex(p.peakL, C, hue, p.compPct, p.colorSpace || state.colorSpace).hex;
+  return colorToHex(p.peakL, C, hue, p.compPct, p.colorSpace || state.colorSpace, p.illuminant || state.illuminant).hex;
 }
 
 /* ════════════════════════════════════
@@ -1441,6 +1479,7 @@ const state = {
   chromaComp: 100,
   lSpacing: 'linear',
   colorSpace: 'oklch',
+  illuminant: 'd65',
   contrastMode: 'off',
   smooth: false,
   systemEnabled: false,
@@ -1482,7 +1521,8 @@ function getParams() {
     smooth:     state.smooth,
     compPct:    state.chromaComp,
     lSpacing:   state.lSpacing,
-    colorSpace: state.colorSpace
+    colorSpace: state.colorSpace,
+    illuminant: state.illuminant
   };
 }
 
@@ -1635,7 +1675,7 @@ function generateRamp(p, overrideHue) {
     const L = isPrism ? PRISM_L[i] : p.rampLight - t * (p.rampLight - p.rampDark);
     const hueAtStep = baseHue + p.hueShift * (t - 0.5) * 2;
     const C = (L <= xs[0] || L >= xs[4]) ? 0 : p.sat * Math.max(0, spline(L));
-    const { hex, clipped, actualC } = colorToHex(L, C, hueAtStep, p.compPct, p.colorSpace);
+    const { hex, clipped, actualC } = colorToHex(L, C, hueAtStep, p.compPct, p.colorSpace, p.illuminant);
     const stepKey = isPrism ? PRISM_KEYS[i] : Math.round(tLinear * 900 + 50);
     swatches.push({ L, C, h: hueAtStep, hex, clipped, actualC, step: stepKey, index: i });
   }
@@ -1682,7 +1722,7 @@ function generateRamp(p, overrideHue) {
     for (let i = 0; i < n; i++) {
       if (Math.abs(smoothed[i] - values[i]) > 1e-9) {
         const s = swatches[i];
-        const { hex, clipped, actualC } = colorToHex(s.L, smoothed[i], s.h, p.compPct, p.colorSpace);
+        const { hex, clipped, actualC } = colorToHex(s.L, smoothed[i], s.h, p.compPct, p.colorSpace, p.illuminant);
         s.hex = hex;
         s.clipped = clipped;
         s.actualC = actualC;
@@ -1834,7 +1874,7 @@ function drawCurve(p) {
   const spline = buildMonotoneCubicSpline(xs, ys);
 
   // Background cache key — excludes lSpacing, steps, and interaction state.
-  const bgKey = `${needW}x${needH}|${p.hue}|${p.hueShift}|${p.rampLight}|${p.rampDark}|${p.peakL}|${p.peakChroma}|${p.sat}|${p.lKneeL}|${p.lKneeC}|${p.rKneeL}|${p.rKneeC}|${p.curveDark}|${p.curveLight}|${p.peakQ}|${p.colorSpace}`;
+  const bgKey = `${needW}x${needH}|${p.hue}|${p.hueShift}|${p.rampLight}|${p.rampDark}|${p.peakL}|${p.peakChroma}|${p.sat}|${p.lKneeL}|${p.lKneeC}|${p.rKneeL}|${p.rKneeC}|${p.curveDark}|${p.curveLight}|${p.peakQ}|${p.colorSpace}|${p.illuminant}`;
 
   if (_curveCache.key !== bgKey) {
     // Redraw the expensive background to an offscreen canvas.
@@ -1883,7 +1923,7 @@ function drawCurve(p) {
       const L = px / W;
       const t = rampSpan > 0 ? (p.rampLight - L) / rampSpan : 0.5;
       const hueAtL = p.hue + p.hueShift * (t - 0.5) * 2;
-      const ceiling = Math.min(findMaxChroma(L, hueAtL, p.colorSpace), maxC);
+      const ceiling = Math.min(findMaxChroma(L, hueAtL, p.colorSpace, p.illuminant), maxC);
       const y = H - (ceiling / maxC) * H;
       if (!ceilStarted) { bc.moveTo(px, y); ceilStarted = true; }
       else { bc.lineTo(px, y); }
@@ -2244,10 +2284,10 @@ function setBgMode(mode) {
   document.getElementById('bg-opt-light').classList.toggle('active', mode === 'light');
 }
 
-function updateHueGradient(colorSpace) {
+function updateHueGradient(colorSpace, illuminant = state.illuminant) {
   const stops = [];
   for (let h = 0; h <= 360; h += 30) {
-    let [r, g, b] = uiToLinearRGB(0.65, 0.2, h, colorSpace);
+    let [r, g, b] = uiToLinearRGB(0.65, 0.2, h, colorSpace, illuminant);
     r = linearToSRGB(clamp01(r));
     g = linearToSRGB(clamp01(g));
     b = linearToSRGB(clamp01(b));
@@ -2266,7 +2306,16 @@ function setColorSpace(mode) {
   document.getElementById('opt-cs-srlch').classList.toggle('active',    mode === 'srlch');
   document.getElementById('opt-cs-jzczhz').classList.toggle('active',   mode === 'jzczhz');
   document.getElementById('opt-cs-munsell').classList.toggle('active',  mode === 'munsell');
-  updateHueGradient(mode);
+  updateHueGradient(mode, state.illuminant);
+  render();
+}
+
+function setIlluminant(mode) {
+  state.illuminant = mode;
+  document.getElementById('opt-il-d50').classList.toggle('active', mode === 'd50');
+  document.getElementById('opt-il-d65').classList.toggle('active', mode === 'd65');
+  document.getElementById('opt-il-d75').classList.toggle('active', mode === 'd75');
+  updateHueGradient(state.colorSpace, mode);
   render();
 }
 

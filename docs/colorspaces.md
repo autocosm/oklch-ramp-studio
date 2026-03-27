@@ -120,6 +120,44 @@ OKLab goes further — its linear transforms were fit empirically to perceptual 
 
 For most SDR web and product design work, the differences between OKLCH and CIELCH are subtle in the midtones but clearly visible at high chroma, particularly for blues and warm yellows. LCHUV produces a distinctly different hue distribution than CIELCH — the hue angles map differently to sRGB primaries — most visibly in the yellow-green and cyan regions. SRLCH produces ramps noticeably better than CIELCH and comparable to OKLCH, with the most visible improvement in the blue and violet hue range. JzCzHz is the most suitable choice for HDR pipelines and produces results comparable to OKLCH for SDR content, with minor differences in dark compression and blue-region hue paths. Munsell is the only space in this tool that is empirically defined rather than mathematically derived; its hue and value scales represent the original perceptual ground truth that the other spaces approximate, making it the natural reference when you need to cross-check against physical color standards or academic color science. For production SDR UI work, OKLCH remains the recommended default.
 
+## Illuminant
+
+Every color space in this tool is defined relative to a *reference white* — the XYZ triplet that represents "perfect white" for that space. All six color spaces use **D65** as their reference white by default, which corresponds to average northern-hemisphere daylight at approximately 6500 K and is the standard for sRGB, CSS color, and screen-based design.
+
+The **Illuminant** setting applies a [Bradford chromatic adaptation transform (CAT)](https://en.wikipedia.org/wiki/Chromatic_adaptation) to the linear RGB output of the chosen color space, simulating how the palette would appear under a different illuminant when viewed on a D65 display. The adaptation is applied before gamut mapping, so the gamut ceiling shown on the curve canvas also updates to reflect the adapted color volume.
+
+### D50 — warm
+
+D50 (5000 K) is the standard illuminant for **graphic arts and print**. ICC profiles for print workflows — CMYK press, proofing, physical color standards — are defined under D50. Under D50 illumination, whites appear slightly warm and yellowish compared to D65: reds and oranges are boosted, blues are pulled back.
+
+Use D50 when:
+- Designing palettes intended for print or soft-proofing against a D50-calibrated monitor
+- Previewing how a D65 screen palette reads under warm indoor or print-booth lighting
+- Matching output to ICC-profile color management pipelines that use D50 as the profile connection space
+
+### Standard D65 — neutral (default)
+
+D65 (6500 K) is the reference illuminant for sRGB, Display P3, Rec. 709, and all CSS color functions. It is the correct choice for any palette that will be displayed on screen without color management conversion. No chromatic adaptation is applied; output is identical to the raw color space conversion.
+
+### D75 — cool
+
+D75 (7500 K) approximates overcast daylight or a northern skylight — a cooler, bluer illuminant than D65. Under D75, blues are intensified and reds are slightly reduced, making palettes read with a cool, crisp character.
+
+Use D75 when:
+- Designing for environments with cool ambient lighting (north-facing windows, overcast outdoor displays)
+- Exploring how a palette behaves at the cooler end of the daylight range
+- Academic comparison of illuminant effects on perceptual color rendering
+
+### How the adaptation works
+
+The implementation uses the **Bradford cone response model** to compute a 3×3 linear RGB→RGB matrix for each target illuminant. The full transform chain is:
+
+```
+linear sRGB (D65) → XYZ_D65 → Bradford LMS → scale by (dest white / D65 white) → Bradford LMS⁻¹ → XYZ_adapted → linear sRGB
+```
+
+This is collapsed into a single pre-computed matrix applied inside `uiToLinearRGB()`. Because the adaptation runs before gamut mapping, the binary-search that finds the sRGB gamut ceiling operates in the adapted color volume — the clipping indicators on the curve canvas accurately reflect which colors will be clipped after the warm or cool shift is applied.
+
 The images below show full hue-spectrum matrices — every hue from 0° to 360° across the columns, ramp stops 50–950 down the rows — rendered first in **OKLCH** and then in **SRLCH**, each in dark and light mode:
 
 
